@@ -14,14 +14,24 @@ In this project, we employ heterogeneous graphs to explicitly capture the spatia
 The code was successfully built and run with these versions:
 
 ```
-pytorch-gpu 1.11.0
+pytorch-gpu 1.12.0
+torchvision 0.13.1
+torchaudio 0.12.0
 cudatoolkit 11.3.1
-pytorch_geometric 2.0.4
+pytorch_geometric 2.1.0.post1
+torch-scatter 2.0.9
+torch-sparse 0.6.15
+torch-cluster 1.6.0
+torch-spline-conv 1.2.1
 opencv 4.6.0.66
 scikit-learn 1.0.2
 
 ```
-Note: You can also create the environment I've tested with by importing _environment.yml_ to conda.
+-You have to install ffmpeg 4.2 and build torchvision from source. You can find the instructions [here](https://github.com/pytorch/vision/blob/main/CONTRIBUTING.md#development-installation).
+
+-Note: You can also create the environment I've tested with by importing _environment.yml_ to conda.
+
+-Note: To enable gpu supprot for Pytorch-Geometric, you have to set ```export LD_LIBRARY_PATH="/home/amir_shirian/anaconda3/envs/end2endHeterGraph/lib:$LD_LIBRARY_PATH"```
 
 
 <br>

@@ -1,6 +1,26 @@
 # directories
 S3D-master/sample/
 .idea
+vision/
+data/AudioSet/eval/
+data/AudioSet/train/
+CrossModalGraph/configs/__pycache__/
+CrossModalGraph/data/__pycache__/
+CrossModalGraph/evaluation/__pycache__/
+CrossModalGraph/model/__pycache__/
+CrossModalGraph/model/meta_arch/__pycache__/
+CrossModalGraph/solver/__pycache__/
+CrossModalGraph/structures/__pycache__/
+CrossModalGraph/train_utils/__pycache__/
+CrossModalGraph/utils/__pycache__/
+
 
 
 # files
+*.pyc
+*.txt
+*.pth
+*.json
+*.pt
+configs/wandb_config.yaml
+checkpoints/*

@@ -10,6 +10,8 @@ import random
 import numpy as np
 import torch
 import torchvision
+from torch import Tensor
+from torchvision.transforms import _functional_video as F
 
 
 def crop(vid, i, j, h, w):
@@ -244,8 +246,7 @@ class RandomCrop(object):
 
     @staticmethod
     def get_params(vid, output_size):
-        """Get parameters for ``crop`` for a random crop.
-        """
+        """Get parameters for ``crop`` for a random crop."""
         h, w = vid.shape[-2:]
         th, tw = output_size
         if w == tw and h == th:
@@ -265,8 +266,7 @@ class RandomSizedCrop(object):
 
     @staticmethod
     def get_params(vid, output_size):
-        """Get parameters for ``crop`` for a random sized crop.
-        """
+        """Get parameters for ``crop`` for a random sized crop."""
         for attempt in range(10):
             h, w = vid.shape[-2:]
             area = h * w
@@ -456,3 +456,55 @@ class ColorJitter(object):
         format_string += ", contrast={0}".format(self.contrast)
         format_string += ", saturation={0}".format(self.saturation)
         return format_string
+
+
+class video_frame_resample(object):
+    r"""Resample a video to a given fps.
+
+    Note:
+        In this version, the resampling is applicable for the smaller fps.
+        For example, if the original fps is 30 and the target fps is 10,
+
+    Args:
+        original_fps (int): The original fps of the video.
+        new_fps (int): The target fps of the video.
+    """
+
+    def __init__(
+        self,
+        new_fps: int,
+        original_fps: int = None,
+    ):
+        self.original_fps = original_fps
+        self.new_fps = new_fps
+
+        if self.original_fps is not None:
+            if self.original_fps < self.new_fps:
+                raise ValueError(
+                    "The original fps should be smaller than the target fps."
+                )
+
+    def __call__(self, clip: Tensor) -> Tensor:
+        """
+        Args:
+            clip (torch.tensor): video clip to be normalized. Size is (T, H, W, C).
+        """
+        if not isinstance(clip, torch.Tensor):
+            raise TypeError("clip should be a torch.Tensor. Got {}".format(type(clip)))
+        if clip.dim() != 4:
+            raise ValueError("clip should be 4D. Got {}".format(clip.dim()))
+        # clip_fps
+
+        # get the number of frames
+        num_frames = clip.shape[0]
+
+        # get the number of frames for the new fps
+        new_num_frames = int(num_frames * self.new_fps / self.original_fps)
+
+        # get the indices of the frames to be sampled
+        indices = np.linspace(0, num_frames - 1, new_num_frames).astype(int)
+
+        # sample the frames
+        clip = clip[indices, :, :, :]
+
+        return clip
