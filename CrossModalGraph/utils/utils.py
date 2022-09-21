@@ -38,6 +38,7 @@ def init_wab(
     entity,
     project_name,
     key,
+    config,
 ):
     import wandb
 
@@ -47,6 +48,8 @@ def init_wab(
         wandb.login(key=wab_config["key"])
         wandb.init(
             project=project_name,
+            group=config.WANDB.GP_NAME,
+            name=config.WANDB.EXP_NAME,
             config=dict(model_config),
             entity=wab_config["entity"],
         )

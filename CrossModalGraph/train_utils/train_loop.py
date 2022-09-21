@@ -189,6 +189,7 @@ class DefaultTrainer(TrainerBase):
                 entity=cfg.WANDB.ENTITY,
                 project_name=cfg.WANDB.PROJECT_NAME,
                 key=cfg.WANDB.KEY,
+                config=cfg,
             )
 
     def resume_or_load(self, resume=True):
@@ -281,7 +282,7 @@ class DefaultTrainer(TrainerBase):
 
         # add wandb logging hook
         if cfg.WANDB.ENABLED:
-            ret.append([hooks.WabLogHook(cfg, eval_period=cfg.WANDB.PERIOD)])
+            ret.append(hooks.WabLogHook(cfg, eval_period=cfg.WANDB.PERIOD))
 
         if comm.is_main_process():
             # Here the default print/log frequency of each writer is used.

@@ -72,7 +72,8 @@ cfg.DATALOADER.DISERED_CLASSES = ["Speech", "Music"]
 #     "Truck",
 # ]
 cfg.MODEL.OUT_DIM = len(cfg.DATALOADER.DISERED_CLASSES)
-cfg.WANDB.PROJECT = f"CrossModalGraph_{cfg.SOLVER.ITERS_TO_ACCUMULATE}_epoch_for_grd_accu_without_graph"
+cfg.WANDB.EXP_NAME = f"{cfg.SOLVER.ITERS_TO_ACCUMULATE}_grd_accu"
+cfg.WANDB.GP_NAME = "without_graph_model"
 trainer = DefaultTrainer(cfg)
 trainer.resume_or_load(resume=False)
 trainer.train()

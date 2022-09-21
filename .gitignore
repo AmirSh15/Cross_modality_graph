@@ -13,6 +13,7 @@ CrossModalGraph/solver/__pycache__/
 CrossModalGraph/structures/__pycache__/
 CrossModalGraph/train_utils/__pycache__/
 CrossModalGraph/utils/__pycache__/
+wandb/
 
 
 

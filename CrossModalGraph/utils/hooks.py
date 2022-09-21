@@ -192,9 +192,10 @@ class PeriodicWriter(HookBase):
         self._period = period
 
     def after_step(self):
-        if (self.trainer.iter + 1) % self._period == 0 or (
-            self.trainer.iter == self.trainer.max_iter - 1
-        ):
+        # if (self.trainer.iter + 1) % self._period == 0 or (
+        #     self.trainer.iter == self.trainer.max_iter - 1
+        # ):
+        if (self.trainer.iter + 1) % self._period == 0:
             for writer in self._writers:
                 writer.write()
 
@@ -581,7 +582,6 @@ class WabLogHook(HookBase):
         super().__init__()
         self.cfg = cfg.clone()
         self.eval_period = eval_period
-        self.verbose = cfg.VERBOSE
 
     def _do_log(self):
         # log to wandb
