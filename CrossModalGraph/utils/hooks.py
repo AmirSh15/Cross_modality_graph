@@ -12,13 +12,14 @@ from collections import Counter
 
 import numpy as np
 import torch
-import wandb
-from fvcore.common.checkpoint import PeriodicCheckpointer as _PeriodicCheckpointer
+from fvcore.common.checkpoint import \
+    PeriodicCheckpointer as _PeriodicCheckpointer
 from fvcore.common.param_scheduler import ParamScheduler
 from fvcore.common.timer import Timer
 from fvcore.nn.precise_bn import get_bn_modules, update_bn_stats
 
 import CrossModalGraph.utils.comm as comm
+import wandb
 from CrossModalGraph.train_utils.lr_scheduler import LRMultiplier
 from CrossModalGraph.train_utils.training_utils import HookBase
 from CrossModalGraph.utils.events import EventStorage, EventWriter
@@ -577,6 +578,7 @@ class EvalHook(HookBase):
         # therefore we clean it to avoid circular reference in the end
         del self._func
 
+
 class WabLogHook(HookBase):
     def __init__(self, cfg, eval_period):
         super().__init__()
@@ -585,11 +587,24 @@ class WabLogHook(HookBase):
 
     def _do_log(self):
         # log to wandb
-        wandb_filter = ["loss", "lr", "accuracy", "iou", "mAP", "grad_norm", "clipped_grad_norm"]
-        # log_dict = {k: v[0] for k, v in self.trainer.storage.latest().items() if
-        #             any([f in k for f in wandb_filter])}
-        log_dict = {k: v.avg(self.eval_period) for k, v in self.trainer.storage.histories().items() if
-                    any([f in k for f in wandb_filter])}
+        wandb_filter = [
+            "loss",
+            "lr",
+            "accuracy",
+            "iou",
+            "mAP",
+            "audio_head_grad_norm",
+            "video_head_grad_norm",
+            "total_grad_norm",
+            "clipped_total_grad_norm",
+            "clipped_audio_head_grad_norm",
+            "clipped_video_head_grad_norm",
+        ]
+        log_dict = {
+            k: v.avg(self.eval_period)
+            for k, v in self.trainer.storage.histories().items()
+            if any([f in k for f in wandb_filter])
+        }
         wandb.log(log_dict, step=self.trainer.iter + 1, commit=False)
 
     def after_step(self):

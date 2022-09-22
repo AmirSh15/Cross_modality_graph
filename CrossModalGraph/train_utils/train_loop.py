@@ -11,25 +11,19 @@ import CrossModalGraph.utils.comm as comm
 import CrossModalGraph.utils.hooks as hooks
 from CrossModalGraph.data.build import build_AudioSet_data_loaders
 from CrossModalGraph.evaluation.AudioSet_evaluation import AudioSetEvaluator
-from CrossModalGraph.evaluation.evaluator import (
-    DatasetEvaluator,
-    DatasetEvaluators,
-    inference_on_dataset,
-)
+from CrossModalGraph.evaluation.evaluator import (DatasetEvaluator,
+                                                  DatasetEvaluators,
+                                                  inference_on_dataset)
 from CrossModalGraph.model.build import build_model
 from CrossModalGraph.solver.build import build_lr_scheduler, build_optimizer
-from CrossModalGraph.train_utils.training_utils import (
-    AMPTrainer,
-    SimpleTrainer,
-    TrainerBase,
-)
-from CrossModalGraph.utils.events import (
-    CommonMetricPrinter,
-    JSONWriter,
-    TensorboardXWriter,
-)
+from CrossModalGraph.train_utils.training_utils import (AMPTrainer,
+                                                        SimpleTrainer,
+                                                        TrainerBase)
+from CrossModalGraph.utils.events import (CommonMetricPrinter, JSONWriter,
+                                          TensorboardXWriter)
 from CrossModalGraph.utils.logger import print_csv_format, setup_logger
-from CrossModalGraph.utils.utils import DetectionCheckpointer, verify_results, init_wab
+from CrossModalGraph.utils.utils import (DetectionCheckpointer, init_wab,
+                                         verify_results)
 
 __all__ = ["DefaultTrainer", "create_ddp_model"]
 
@@ -50,7 +44,8 @@ def create_ddp_model(model, *, fp16_compression=False, **kwargs):
         kwargs["device_ids"] = [comm.get_local_rank()]
     ddp = DistributedDataParallel(model, **kwargs)
     if fp16_compression:
-        from torch.distributed.algorithms.ddp_comm_hooks import default as comm_hooks
+        from torch.distributed.algorithms.ddp_comm_hooks import \
+            default as comm_hooks
 
         ddp.register_comm_hook(state=None, hook=comm_hooks.fp16_compress_hook)
     return ddp
@@ -165,7 +160,7 @@ class DefaultTrainer(TrainerBase):
             print("Number of trainbale params: %.2f K" % (params / 1e3))
 
         self._trainer = (AMPTrainer if cfg.SOLVER.AMP.ENABLED else SimpleTrainer)(
-            model, data_loader_tr, optimizer, cfg.SOLVER.ITERS_TO_ACCUMULATE
+            model, data_loader_tr, optimizer, cfg
         )
 
         self.scheduler = self.build_lr_scheduler(cfg, optimizer)

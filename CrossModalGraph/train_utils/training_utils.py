@@ -238,7 +238,7 @@ class SimpleTrainer(TrainerBase):
     or write your own training loop.
     """
 
-    def __init__(self, model, data_loader, optimizer, iters_to_accumulate=1):
+    def __init__(self, model, data_loader, optimizer, config=None):
         """
         Args:
             model: a torch Module. Takes a data from data_loader and returns a
@@ -261,7 +261,8 @@ class SimpleTrainer(TrainerBase):
         self._data_loader_iter = iter(data_loader)
         self.optimizer = optimizer
         self.accumulative_counter = 0
-        self.iters_to_accumulate = iters_to_accumulate
+        self.iters_to_accumulate = config.SOLVER.ITERS_TO_ACCUMULATE
+        self.grd_clip = config.SOLVER.MY_CLIP_GRADIENTS.ENABLED
 
     def run_step(self):
         """
@@ -292,17 +293,14 @@ class SimpleTrainer(TrainerBase):
         # self.optimizer.zero_grad()
         losses.backward()
 
-        # apply gradient clipping
-        grad_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
-
         # compute gradient norm
-        clipped_grad_norm = compute_gradient_norm(self.model.parameters())
+        grad_norm = gradient_utils(self.model, self.grd_clip)
 
         self._write_metrics(loss_dict, data_time)
         # just support mAP and accuracy, to add go to events line 466
         self._write_metrics(metric, data_time)
         # # write gradient norm
-        self._write_metrics({"grad_norm": grad_norm, "clipped_grad_norm": clipped_grad_norm}, data_time)
+        self._write_metrics(grad_norm, data_time)
 
         """
         If you need gradient clipping/scaling or other processing, you can
@@ -320,18 +318,18 @@ class SimpleTrainer(TrainerBase):
         self.accumulative_counter += 1
 
     def _write_metrics(
-            self,
-            loss_dict: Mapping[str, torch.Tensor],
-            data_time: float,
-            prefix: str = "",
+        self,
+        loss_dict: Mapping[str, torch.Tensor],
+        data_time: float,
+        prefix: str = "",
     ) -> None:
         SimpleTrainer.write_metrics(loss_dict, data_time, prefix)
 
     @staticmethod
     def write_metrics(
-            loss_dict: Mapping[str, torch.Tensor],
-            data_time: float,
-            prefix: str = "",
+        loss_dict: Mapping[str, torch.Tensor],
+        data_time: float,
+        prefix: str = "",
     ) -> None:
         """
         Args:
@@ -392,7 +390,7 @@ class AMPTrainer(SimpleTrainer):
     in the training loop.
     """
 
-    def __init__(self, model, data_loader, optimizer, iters_to_accumulate=1, grad_scaler=None):
+    def __init__(self, model, data_loader, optimizer, grad_scaler=None, config=None):
         """
         Args:
             model, data_loader, optimizer: same as in :class:`SimpleTrainer`.
@@ -412,7 +410,8 @@ class AMPTrainer(SimpleTrainer):
 
             grad_scaler = GradScaler()
         self.grad_scaler = grad_scaler
-        self.accumulative_counter = iters_to_accumulate
+        self.accumulative_counter = config.SOLVER.ITERS_TO_ACCUMULATE
+        self.grd_clip = config.SOLVER.MY_CLIP_GRADIENTS.ENABLED
 
     def run_step(self):
         """
@@ -442,15 +441,12 @@ class AMPTrainer(SimpleTrainer):
         # Unscales the gradients of optimizer's assigned params in-place
         self.grad_scaler.unscale_(self.optimizer)
 
-        # apply gradient clipping
-        grad_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
-
         # compute gradient norm
-        clipped_grad_norm = compute_gradient_norm(self.model.parameters())
+        grad_norm = gradient_utils(self.model, self.grd_clip)
 
         self._write_metrics(loss_dict, data_time)
         self._write_metrics(metric, data_time)
-        self._write_metrics({"grad_norm": grad_norm, "clipped_grad_norm": clipped_grad_norm}, data_time)
+        self._write_metrics(grad_norm, data_time)
 
         # self.grad_scaler.step(self.optimizer)
         # self.grad_scaler.update()
@@ -490,8 +486,10 @@ def compute_gradient_norm(parameters, norm_type=2):
     if len(parameters) == 0:
         total_norm = 0.0
     else:
-        total_norm = torch.norm(torch.stack([torch.norm(p.grad.detach(), norm_type) for p in parameters]),
-                                norm_type)
+        total_norm = torch.norm(
+            torch.stack([torch.norm(p.grad.detach(), norm_type) for p in parameters]),
+            norm_type,
+        )
 
     # parameters = list(filter(lambda p: p.grad is not None, parameters))
     # total_norm = 0
@@ -501,3 +499,47 @@ def compute_gradient_norm(parameters, norm_type=2):
     # total_norm = total_norm ** (1.0 / norm_type)
 
     return total_norm
+
+
+def gradient_utils(model, grd_clip: bool):
+    """
+    Compute gradient norm of submodules separately and total.
+
+    Args:
+        model: model to compute gradient norm
+        grd_clip: gradient clipping (boolean)
+    """
+    # apply gradient clipping
+    if grd_clip:
+        # compute gradient norm
+        audio_head_grad_norm = compute_gradient_norm(model.audio_head.parameters())
+        video_head_grad_norm = compute_gradient_norm(model.video_head.parameters())
+        total_grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+
+        # compute gradient norm
+        clipped_total_grad_norm = compute_gradient_norm(model.parameters())
+        clipped_audio_head_grad_norm = compute_gradient_norm(
+            model.audio_head.parameters()
+        )
+        clipped_video_head_grad_norm = compute_gradient_norm(
+            model.video_head.parameters()
+        )
+    else:
+        audio_head_grad_norm = clipped_total_grad_norm = compute_gradient_norm(
+            model.audio_head.parameters()
+        )
+        video_head_grad_norm = clipped_audio_head_grad_norm = compute_gradient_norm(
+            model.video_head.parameters()
+        )
+        total_grad_norm = clipped_video_head_grad_norm = compute_gradient_norm(
+            model.parameters()
+        )
+
+    return {
+        "audio_head_grad_norm": audio_head_grad_norm,
+        "video_head_grad_norm": video_head_grad_norm,
+        "total_grad_norm": total_grad_norm,
+        "clipped_total_grad_norm": clipped_total_grad_norm,
+        "clipped_audio_head_grad_norm": clipped_audio_head_grad_norm,
+        "clipped_video_head_grad_norm": clipped_video_head_grad_norm,
+    }

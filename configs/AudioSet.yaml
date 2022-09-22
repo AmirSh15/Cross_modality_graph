@@ -3,14 +3,11 @@ MODEL:
   AUDIO_BACKBONE:
     NAME: "WAV2VEC2_BASE"
     PRETRAINED_ON: ""
-    FINETUNE: False
+    FINETUNE: True
   VIDEO_BACKBONE:
     NAME: "r3d_18"
     PRETRAINED_ON: ""
-    FINETUNE: False
-  IMAGE_BACKBONE:
-    NAME: "Resnext"
-    PRETRAINED_ON: "ImageNet"
+    FINETUNE: True
   HIDDEN_CHANNELS: 512
   NUM_LAYERS: 4
 TRAINING:
@@ -42,10 +39,10 @@ DATASETS:
   TRAIN_PATH: "/home/amir_shirian/Desktop/Codes/Cross_modality_graph/data/AudioSet/train"
   TEST_PATH: "/home/amir_shirian/Desktop/Codes/Cross_modality_graph/data/AudioSet/eval"
 TEST:
-  MAX_PATIENCE: 10
+  MAX_PATIENCE: 3
   EVAL_PERIOD: 2500
 DATALOADER:
-  BATCH_SIZE: 4
+  BATCH_SIZE: 2
   STRATIFIED_SPLIT: True
   NUM_WORKERS: 6
 SOLVER:
@@ -55,10 +52,13 @@ SOLVER:
   MAX_ITER: 100000
   WARMUP_ITERS: 1000
 # number of epochs to be accumulated before updating the parameters
-  ITERS_TO_ACCUMULATE: 1
+  ITERS_TO_ACCUMULATE: 2
 # option to enable 16-bit training
   AMP:
     ENABLED: False
+  MY_CLIP_GRADIENTS:
+    ENABLED: True
+  CLIP_VALUE: 1.0
 INPUT:
   MIN_SIZE_TRAIN: (640, 672, 704, 736, 768, 800)
 VERSION: 0

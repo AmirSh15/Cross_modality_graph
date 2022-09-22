@@ -10,7 +10,6 @@ from sklearn import metrics
 
 from CrossModalGraph.configs.config import configurable
 from CrossModalGraph.model.build import META_ARCH_REGISTRY
-
 # from torch_geometric.nn import HeteroConv
 from CrossModalGraph.model.utils import HeteroConv
 from CrossModalGraph.structures.instances import Instances

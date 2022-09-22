@@ -1,10 +1,9 @@
 import math
-import numpy as np
 from collections import defaultdict
-
 # from torch_geometric.nn.conv.hgt_conv import group
 from typing import Any, Dict, List, Optional, Union
 
+import numpy as np
 import torch
 from torch import Tensor
 from torch.nn import Module, ModuleDict

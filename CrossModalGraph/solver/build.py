@@ -3,13 +3,16 @@ import copy
 import itertools
 import logging
 from enum import Enum
-from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Type, Union
+from typing import (Any, Callable, Dict, Iterable, List, Optional, Set, Type,
+                    Union)
 
 import torch
-from fvcore.common.param_scheduler import CosineParamScheduler, MultiStepParamScheduler
+from fvcore.common.param_scheduler import (CosineParamScheduler,
+                                           MultiStepParamScheduler)
 
 from CrossModalGraph.configs.config import CfgNode
-from CrossModalGraph.train_utils.lr_scheduler import LRMultiplier, WarmupParamScheduler
+from CrossModalGraph.train_utils.lr_scheduler import (LRMultiplier,
+                                                      WarmupParamScheduler)
 
 _GradientClipperInput = Union[torch.Tensor, Iterable[torch.Tensor]]
 _GradientClipper = Callable[[_GradientClipperInput], None]

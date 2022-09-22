@@ -7,30 +7,21 @@ from kornia.losses import focal_loss
 from sklearn import metrics
 from torch import nn
 from torch.nn.init import xavier_uniform_
-
 # from CrossModalGraph.model.GNN_models import GATConv
-from torch_geometric.nn import (
-    GATConv,
-    GATv2Conv,
-    GCNConv,
-    GlobalAttention,
-    LayerNorm,
-    Linear,
-    SAGEConv,
-    TransformerConv,
-    global_max_pool,
-    global_mean_pool,
-)
-
-# from torch_geometric.nn.glob.gmt import GraphMultisetTransformer
+from torch_geometric.nn import (GATConv, GATv2Conv, GCNConv, GlobalAttention,
+                                LayerNorm, Linear, SAGEConv, TransformerConv,
+                                global_max_pool, global_mean_pool)
 
 from CrossModalGraph.configs.config import configurable
 from CrossModalGraph.model.build import META_ARCH_REGISTRY
-
 # from torch_geometric.nn import HeteroConv
 from CrossModalGraph.model.utils import HeteroConv
 from CrossModalGraph.structures.instances import Instances
 from CrossModalGraph.utils.events import get_event_storage
+
+# from torch_geometric.nn.glob.gmt import GraphMultisetTransformer
+
+
 
 __all__ = ["ResNet1D"]
 

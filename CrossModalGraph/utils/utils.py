@@ -2,10 +2,10 @@ import logging
 import os
 import pickle
 import pprint
+import random
 import string
 import sys
 from collections.abc import Mapping
-import random
 
 import cv2
 import numpy as np
@@ -15,11 +15,11 @@ import yaml
 from fvcore.common.checkpoint import Checkpointer
 from PIL import Image
 from torch.nn.parallel import DistributedDataParallel
+from yaml.loader import SafeLoader
 
 import CrossModalGraph.utils.comm as comm
-from CrossModalGraph.utils.file_io import PathManager
 from CrossModalGraph.configs.config import get_cfg
-from yaml.loader import SafeLoader
+from CrossModalGraph.utils.file_io import PathManager
 
 __all__ = [
     "print_mem",
@@ -35,6 +35,7 @@ __all__ = [
     "get_random_string",
     "setup_random_seed",
 ]
+
 
 def read_config():
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -127,11 +128,13 @@ def init_wab(
             entity=entity,
         )
 
+
 def get_random_string(length):
     # choose from all lowercase letter
     letters = string.ascii_lowercase
-    result_str = ''.join(random.choice(letters) for i in range(length))
+    result_str = "".join(random.choice(letters) for i in range(length))
     print("Random string of length", length, "is:", result_str)
+
 
 def setup_random_seed(seed):
     """

@@ -143,11 +143,6 @@ _C.MODEL.VIDEO_BACKBONE.NAME = "r3d_18"
 _C.MODEL.VIDEO_BACKBONE.PRETRAINED_ON = ""
 _C.MODEL.VIDEO_BACKBONE.FINETUNE = True
 
-_C.MODEL.IMAGE_BACKBONE = CN()
-
-_C.MODEL.IMAGE_BACKBONE.NAME = "Vggish"
-_C.MODEL.IMAGE_BACKBONE.PRETRAINED_ON = "Vggish"
-
 # set network params
 # middle representation dimension
 _C.MODEL.HIDDEN_CHANNELS = 128
@@ -246,6 +241,7 @@ _C.SOLVER.WEIGHT_DECAY_BIAS = _C.SOLVER.WEIGHT_DECAY
 
 # Gradient clipping
 _C.SOLVER.CLIP_GRADIENTS = CN({"ENABLED": False})
+_C.SOLVER.MY_CLIP_GRADIENTS = CN({"ENABLED": False})
 # Type of gradient clipping, currently 2 values are supported:
 # - "value": the absolute values of elements of each gradients are clipped
 # - "norm": the norm of the gradient for each parameter is clipped thus

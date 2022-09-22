@@ -2,16 +2,15 @@ import itertools
 import logging
 
 import numpy as np
+import torch
+from sklearn.model_selection import train_test_split
 from tabulate import tabulate
 from termcolor import colored
+from torch_geometric.loader import DataLoader
 
 from CrossModalGraph.data.samplers import *
 from CrossModalGraph.utils.logger import log_first_n
-import torch
-from torch_geometric.loader import DataLoader
-
 from utils.VideoDataloader import AudioSetGraphDataset, get_transforms
-from sklearn.model_selection import train_test_split
 
 
 def build_AudioSet_data_loaders(cfg, output_mode="train"):

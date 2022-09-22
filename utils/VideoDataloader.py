@@ -6,20 +6,19 @@ import warnings
 import numpy as np
 import torch
 import torchvision
-from torchvision.io import VideoReader, read_video_timestamps, read_video
 from torch.utils.data import DataLoader, Dataset
-from torchaudio import transforms as audio_T
-from torchvision import transforms as frame_T
-from torchvision.transforms import _transforms_video as transforms_video
-from utils.transforms import *
-
-from torchvision.models.video import R3D_18_Weights
-from torchaudio.pipelines import WAV2VEC2_BASE, WAV2VEC2_LARGE, WAV2VEC2_LARGE_LV60K
-
-from CrossModalGraph.configs.config import get_cfg
-
 from torch_geometric.data import HeteroData
 from torch_geometric.loader import DataLoader as GraphDataLoader
+from torchaudio import transforms as audio_T
+from torchaudio.pipelines import (WAV2VEC2_BASE, WAV2VEC2_LARGE,
+                                  WAV2VEC2_LARGE_LV60K)
+from torchvision import transforms as frame_T
+from torchvision.io import VideoReader, read_video, read_video_timestamps
+from torchvision.models.video import R3D_18_Weights
+from torchvision.transforms import _transforms_video as transforms_video
+
+from CrossModalGraph.configs.config import get_cfg
+from utils.transforms import *
 
 
 def get_transforms(cfg):

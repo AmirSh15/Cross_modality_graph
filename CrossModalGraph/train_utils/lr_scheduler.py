@@ -5,12 +5,10 @@ from bisect import bisect_right
 from typing import List
 
 import torch
-from fvcore.common.param_scheduler import (
-    CompositeParamScheduler,
-    ConstantParamScheduler,
-    LinearParamScheduler,
-    ParamScheduler,
-)
+from fvcore.common.param_scheduler import (CompositeParamScheduler,
+                                           ConstantParamScheduler,
+                                           LinearParamScheduler,
+                                           ParamScheduler)
 
 logger = logging.getLogger(__name__)
 

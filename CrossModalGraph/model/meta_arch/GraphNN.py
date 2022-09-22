@@ -1,50 +1,38 @@
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn.functional as F
 from kornia.losses import focal_loss
+from scipy import signal
+from scipy.signal import savgol_filter
 from sklearn import metrics
+from sklearn.metrics.pairwise import cosine_similarity
 from torch import nn
 from torch.nn.init import xavier_uniform_
 from torch_geometric.data import HeteroData
-
-from scipy.signal import savgol_filter
-import matplotlib.pyplot as plt
-from scipy import signal
-
-from CrossModalGraph.model.utils import pairwise_distances, num_of_graphs
-from sklearn.metrics.pairwise import cosine_similarity
-
 # from CrossModalGraph.model.GNN_models import GATConv
-from torch_geometric.nn import (
-    GATConv,
-    GATv2Conv,
-    GCNConv,
-    GlobalAttention,
-    LayerNorm,
-    GraphNorm,
-    PairNorm,
-    InstanceNorm,
-    Linear,
-    SAGEConv,
-    TransformerConv,
-    global_max_pool,
-    global_mean_pool,
-)
-
-# from torch_geometric.nn.glob.gmt import GraphMultisetTransformer
+from torch_geometric.nn import (GATConv, GATv2Conv, GCNConv, GlobalAttention,
+                                GraphNorm, InstanceNorm, LayerNorm, Linear,
+                                PairNorm, SAGEConv, TransformerConv,
+                                global_max_pool, global_mean_pool)
+from torchaudio.pipelines import (WAV2VEC2_BASE, WAV2VEC2_LARGE,
+                                  WAV2VEC2_LARGE_LV60K)
+from torchvision.models.video import R3D_18_Weights, r3d_18
 
 from CrossModalGraph.configs.config import configurable
 from CrossModalGraph.model.build import META_ARCH_REGISTRY
-
 # from torch_geometric.nn import HeteroConv
-from CrossModalGraph.model.utils import HeteroConv
+from CrossModalGraph.model.utils import (HeteroConv, num_of_graphs,
+                                         pairwise_distances)
 from CrossModalGraph.structures.instances import Instances
 from CrossModalGraph.utils.events import get_event_storage
 from CrossModalGraph.utils.utils import atten_dive_score
-from torchvision.models.video import r3d_18, R3D_18_Weights
-from torchaudio.pipelines import WAV2VEC2_BASE, WAV2VEC2_LARGE, WAV2VEC2_LARGE_LV60K
+
+# from torch_geometric.nn.glob.gmt import GraphMultisetTransformer
+
+
 
 __all__ = ["EndToEndHeteroGNN"]
 
