@@ -3,11 +3,11 @@ MODEL:
   AUDIO_BACKBONE:
     NAME: "WAV2VEC2_BASE"
     PRETRAINED_ON: ""
-    FINETUNE: True
+    FINETUNE: False
   VIDEO_BACKBONE:
     NAME: "r3d_18"
     PRETRAINED_ON: ""
-    FINETUNE: True
+    FINETUNE: False
   IMAGE_BACKBONE:
     NAME: "Resnext"
     PRETRAINED_ON: "ImageNet"
@@ -54,7 +54,11 @@ SOLVER:
   STEPS: ()
   MAX_ITER: 100000
   WARMUP_ITERS: 1000
-  ITERS_TO_ACCUMULATE: 4
+# number of epochs to be accumulated before updating the parameters
+  ITERS_TO_ACCUMULATE: 1
+# option to enable 16-bit training
+  AMP:
+    ENABLED: False
 INPUT:
   MIN_SIZE_TRAIN: (640, 672, 704, 736, 768, 800)
 VERSION: 0

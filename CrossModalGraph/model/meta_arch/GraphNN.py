@@ -443,7 +443,7 @@ class EndToEndHeteroGNN(nn.Module):
         # hook for extracting intermediate features
         def get_features(name):
             def hook(model, input, output):
-                features[name] = output.detach()
+                features[name] = output
 
             return hook
 
@@ -589,8 +589,8 @@ class EndToEndHeteroGNN(nn.Module):
         video_feats = self.video_head_forward(video)
 
         # apply norm layers
-        audio_feats = self.pre_norm_audio(audio_feats)
-        video_feats = self.pre_norm_video(video_feats)
+        # audio_feats = self.pre_norm_audio(audio_feats)
+        # video_feats = self.pre_norm_video(video_feats)
 
         # update graph data
         batched_x["audio"] = audio_feats.flatten(start_dim=0, end_dim=1)

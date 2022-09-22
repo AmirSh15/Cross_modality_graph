@@ -54,7 +54,7 @@ _C.WANDB.CONFIG_PATH = ""
 _C.WANDB.ENABLED = False
 # Add the period of saving snapshots of model logs to wandb
 _C.WANDB.PERIOD = 100
-
+_C.WANDB.ID = "x"
 
 # -----------------------------------------------------------------------------
 # Audio model options

@@ -195,7 +195,7 @@ class PeriodicWriter(HookBase):
         # if (self.trainer.iter + 1) % self._period == 0 or (
         #     self.trainer.iter == self.trainer.max_iter - 1
         # ):
-        if (self.trainer.iter + 1) % self._period == 0:
+        if self.trainer.iter % self._period == 0:
             for writer in self._writers:
                 writer.write()
 
@@ -585,8 +585,10 @@ class WabLogHook(HookBase):
 
     def _do_log(self):
         # log to wandb
-        wandb_filter = ["loss", "lr", "accuracy", "iou", "mAP"]
-        log_dict = {k: v[0] for k, v in self.trainer.storage.latest().items() if
+        wandb_filter = ["loss", "lr", "accuracy", "iou", "mAP", "grad_norm", "clipped_grad_norm"]
+        # log_dict = {k: v[0] for k, v in self.trainer.storage.latest().items() if
+        #             any([f in k for f in wandb_filter])}
+        log_dict = {k: v.avg(self.eval_period) for k, v in self.trainer.storage.histories().items() if
                     any([f in k for f in wandb_filter])}
         wandb.log(log_dict, step=self.trainer.iter + 1, commit=False)
 

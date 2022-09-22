@@ -2,8 +2,10 @@ import logging
 import os
 import pickle
 import pprint
+import string
 import sys
 from collections.abc import Mapping
+import random
 
 import cv2
 import numpy as np
@@ -16,6 +18,7 @@ from torch.nn.parallel import DistributedDataParallel
 
 import CrossModalGraph.utils.comm as comm
 from CrossModalGraph.utils.file_io import PathManager
+from CrossModalGraph.configs.config import get_cfg
 from yaml.loader import SafeLoader
 
 __all__ = [
@@ -29,7 +32,69 @@ __all__ = [
     "flatten_results_dict",
     "verify_results",
     "init_wab",
+    "get_random_string",
+    "setup_random_seed",
 ]
+
+def read_config():
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    cfg = get_cfg()
+    cfg.merge_from_file("configs/AudioSet.yaml")
+    cfg.DEVICE = device
+    cfg.MODEL.DEVICE = device
+    os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)
+    cfg.DATALOADER.SAMPLER_TRAIN = "TrainingSampler"  # "RepeatFactorTrainingSampler"
+    # specify the disered classes
+    cfg.DATALOADER.DISERED_CLASSES = ["Speech", "Music"]
+    # cfg.DATALOADER.DISERED_CLASSES = [
+    #     "Speech",
+    #     "Music",
+    #     "Cat",
+    #     "Dog",
+    #     "Car",
+    #     "Train",
+    #     "Bird",
+    #     "Gunshot, gunfire",
+    # ]
+
+    # cfg.DATALOADER.DISERED_CLASSES = [
+    #     "Aircraft",
+    #     "Ambulance (siren)",
+    #     "Bicycle",
+    #     "Bird",
+    #     "Boom",
+    #     "Bus",
+    #     "Camera",
+    #     "Car",
+    #     "Cash register",
+    #     "Cat",
+    #     "Cattle, bovinae",
+    #     "Church bell",
+    #     "Clock",
+    #     "Dog",
+    #     "Mechanical fan",
+    #     "Fireworks",
+    #     "Goat",
+    #     "Gunshot, gunfire",
+    #     "Hammer",
+    #     "Horse",
+    #     "Motorcycle",
+    #     "Ocean",
+    #     "Pant",
+    #     "Pig",
+    #     "Printer",
+    #     "Rain",
+    #     "Sawing",
+    #     "Sewing machine",
+    #     "Skateboard",
+    #     "Stream",
+    #     "Thunderstorm",
+    #     "Train",
+    #     "Truck",
+    # ]
+
+    return cfg
 
 
 def init_wab(
@@ -52,6 +117,7 @@ def init_wab(
             name=config.WANDB.EXP_NAME,
             config=dict(model_config),
             entity=wab_config["entity"],
+            id=config.WANDB.ID,
         )
     else:
         wandb.login(key=key)
@@ -60,6 +126,23 @@ def init_wab(
             config=model_config,
             entity=entity,
         )
+
+def get_random_string(length):
+    # choose from all lowercase letter
+    letters = string.ascii_lowercase
+    result_str = ''.join(random.choice(letters) for i in range(length))
+    print("Random string of length", length, "is:", result_str)
+
+def setup_random_seed(seed):
+    """
+    Set a fixed random seed for reproducible experiments.
+    """
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    np.random.seed(seed)
+    random.seed(seed)
 
 
 def print_mem(p):

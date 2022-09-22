@@ -278,9 +278,7 @@ class SimpleTrainer(TrainerBase):
         """
         If you want to do something with the losses, you can wrap the model.
         """
-        scaler = torch.cuda.amp.GradScaler()
-        with torch.cuda.amp.autocast():
-            loss_dict, metric = self.model(data)
+        loss_dict, metric = self.model(data)
         if isinstance(loss_dict, torch.Tensor):
             losses = loss_dict
             loss_dict = {"total_loss": loss_dict}
@@ -292,30 +290,29 @@ class SimpleTrainer(TrainerBase):
         wrap the optimizer with your custom `zero_grad()` method.
         """
         # self.optimizer.zero_grad()
-        # losses.backward()
-        scaler.scale(losses).backward()
+        losses.backward()
+
+        # apply gradient clipping
+        grad_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
+
+        # compute gradient norm
+        clipped_grad_norm = compute_gradient_norm(self.model.parameters())
 
         self._write_metrics(loss_dict, data_time)
         # just support mAP and accuracy, to add go to events line 466
         self._write_metrics(metric, data_time)
+        # # write gradient norm
+        self._write_metrics({"grad_norm": grad_norm, "clipped_grad_norm": clipped_grad_norm}, data_time)
 
         """
         If you need gradient clipping/scaling or other processing, you can
         wrap the optimizer with your custom `step()` method. But it is
         suboptimal as explained in https://arxiv.org/abs/2006.15704 Sec 3.2.4
         """
-        # self.optimizer.step()
-
         if (self.accumulative_counter + 1) % self.iters_to_accumulate == 0:
-
             self.accumulative_counter = 0
 
-            # Unscales gradients and calls
-            # or skips optimizer.step()
-            scaler.step(self.optimizer)
-
-            # Updates the scale for next iteration
-            scaler.update()
+            self.optimizer.step()
 
             self.optimizer.zero_grad()
 
@@ -323,18 +320,18 @@ class SimpleTrainer(TrainerBase):
         self.accumulative_counter += 1
 
     def _write_metrics(
-        self,
-        loss_dict: Mapping[str, torch.Tensor],
-        data_time: float,
-        prefix: str = "",
+            self,
+            loss_dict: Mapping[str, torch.Tensor],
+            data_time: float,
+            prefix: str = "",
     ) -> None:
         SimpleTrainer.write_metrics(loss_dict, data_time, prefix)
 
     @staticmethod
     def write_metrics(
-        loss_dict: Mapping[str, torch.Tensor],
-        data_time: float,
-        prefix: str = "",
+            loss_dict: Mapping[str, torch.Tensor],
+            data_time: float,
+            prefix: str = "",
     ) -> None:
         """
         Args:
@@ -415,6 +412,7 @@ class AMPTrainer(SimpleTrainer):
 
             grad_scaler = GradScaler()
         self.grad_scaler = grad_scaler
+        self.accumulative_counter = iters_to_accumulate
 
     def run_step(self):
         """
@@ -431,20 +429,46 @@ class AMPTrainer(SimpleTrainer):
         data_time = time.perf_counter() - start
 
         with autocast():
-            loss_dict = self.model(data)
+            loss_dict, metric = self.model(data)
             if isinstance(loss_dict, torch.Tensor):
                 losses = loss_dict
                 loss_dict = {"total_loss": loss_dict}
             else:
                 losses = sum(loss_dict.values())
 
-        self.optimizer.zero_grad()
+        # self.optimizer.zero_grad()
         self.grad_scaler.scale(losses).backward()
 
-        self._write_metrics(loss_dict, data_time)
+        # Unscales the gradients of optimizer's assigned params in-place
+        self.grad_scaler.unscale_(self.optimizer)
 
-        self.grad_scaler.step(self.optimizer)
-        self.grad_scaler.update()
+        # apply gradient clipping
+        grad_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
+
+        # compute gradient norm
+        clipped_grad_norm = compute_gradient_norm(self.model.parameters())
+
+        self._write_metrics(loss_dict, data_time)
+        self._write_metrics(metric, data_time)
+        self._write_metrics({"grad_norm": grad_norm, "clipped_grad_norm": clipped_grad_norm}, data_time)
+
+        # self.grad_scaler.step(self.optimizer)
+        # self.grad_scaler.update()
+
+        if (self.accumulative_counter + 1) % self.iters_to_accumulate == 0:
+            self.accumulative_counter = 0
+
+            # Unscales gradients and calls
+            # or skips optimizer.step()
+            self.grad_scaler.step(self.optimizer)
+
+            # Updates the scale for next iteration
+            self.grad_scaler.update()
+
+            self.optimizer.zero_grad()
+
+        # increment the iteration counter
+        self.accumulative_counter += 1
 
     def state_dict(self):
         ret = super().state_dict()
@@ -454,3 +478,26 @@ class AMPTrainer(SimpleTrainer):
     def load_state_dict(self, state_dict):
         super().load_state_dict(state_dict)
         self.grad_scaler.load_state_dict(state_dict["grad_scaler"])
+
+
+def compute_gradient_norm(parameters, norm_type=2):
+    """
+    Compute gradient norm of a list of parameters.
+    This is a modified version of torch.nn.utils.clip_grad_norm_ that
+    operates on a list of parameters, rather than a single Variable.
+    """
+    parameters = [p for p in parameters if p.grad is not None and p.requires_grad]
+    if len(parameters) == 0:
+        total_norm = 0.0
+    else:
+        total_norm = torch.norm(torch.stack([torch.norm(p.grad.detach(), norm_type) for p in parameters]),
+                                norm_type)
+
+    # parameters = list(filter(lambda p: p.grad is not None, parameters))
+    # total_norm = 0
+    # for p in parameters:
+    #     param_norm = p.grad.data.norm(norm_type)
+    #     total_norm += param_norm.item() ** norm_type
+    # total_norm = total_norm ** (1.0 / norm_type)
+
+    return total_norm
