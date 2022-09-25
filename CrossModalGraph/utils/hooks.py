@@ -589,6 +589,7 @@ class WabLogHook(HookBase):
         # log to wandb
         wandb_filter = [
             "loss",
+            "roc"
             "lr",
             "accuracy",
             "iou",

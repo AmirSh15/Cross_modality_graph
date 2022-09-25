@@ -562,6 +562,7 @@ class EndToEndHeteroGNN(nn.Module):
         #     multi_class='ovr' )
         # except ValueError:
         #     roc = np.array([np.nan] * 527)
+        roc = np.array([np.nan] * 527)
 
         # computing accuracy
         acc = (
@@ -585,6 +586,12 @@ class EndToEndHeteroGNN(nn.Module):
                 / average_precision.shape[0]
             )
         ).to(self.device)
+        metric["roc"] = torch.from_numpy(
+            np.asarray(
+                roc[~np.isnan(roc)].sum() / roc.shape[0]
+            )
+        ).to(self.device)
+
         metric["accuracy"] = torch.from_numpy(np.asarray(acc)).to(self.device)
 
         return losses, metric
