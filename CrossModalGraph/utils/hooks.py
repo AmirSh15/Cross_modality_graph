@@ -603,8 +603,15 @@ class WabLogHook(HookBase):
         log_dict = {
             k: v.avg(self.eval_period)
             for k, v in self.trainer.storage.histories().items()
-            if any([f in k for f in wandb_filter])
+            if any([f in k for f in wandb_filter]) and "val" not in k
         }
+        log_dict.update(
+            {
+                k: v[0]
+                for k, v in self.trainer.storage.latest().items()
+                if any([f in k for f in wandb_filter]) and "val" in k
+            }
+        )
         wandb.log(log_dict, step=self.trainer.iter + 1, commit=False)
 
     def after_step(self):

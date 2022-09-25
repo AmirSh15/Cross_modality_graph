@@ -191,6 +191,16 @@ _C.TRAINING = CN()
 _C.TRAINING.LOSS = "CrossEntropyLoss"  # "FocalLoss"
 # The period (in terms of steps) to evaluate the model during training.
 _C.TRAINING.TRAIN_PLOT_PERIOD = 201
+# Add l2 regularization
+_C.TRAINING.L2_REGULARIZATION = False
+# Add label smoothing
+_C.TRAINING.LABEL_SMOOTHING = 0.0
+# Add class weights
+_C.TRAINING.CLASS_WEIGHTS = False
+# Add non-linear activation function
+_C.TRAINING.NON_LINEAR_ACTIVATION = (
+    ""  # "LogSigmoid", "Softmax", "LogSoftmax", "Sigmoid"
+)
 
 # ---------------------------------------------------------------------------- #
 # solver

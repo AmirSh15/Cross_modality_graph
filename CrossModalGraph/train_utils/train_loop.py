@@ -160,7 +160,7 @@ class DefaultTrainer(TrainerBase):
             print("Number of trainbale params: %.2f K" % (params / 1e3))
 
         self._trainer = (AMPTrainer if cfg.SOLVER.AMP.ENABLED else SimpleTrainer)(
-            model, data_loader_tr, optimizer, cfg
+            model, data_loader_tr, optimizer, config=cfg
         )
 
         self.scheduler = self.build_lr_scheduler(cfg, optimizer)

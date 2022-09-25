@@ -47,7 +47,7 @@ def read_config():
     os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)
     cfg.DATALOADER.SAMPLER_TRAIN = "TrainingSampler"  # "RepeatFactorTrainingSampler"
     # specify the disered classes
-    cfg.DATALOADER.DISERED_CLASSES = ["Speech", "Music"]
+    # cfg.DATALOADER.DISERED_CLASSES = ["Speech", "Music"]
     # cfg.DATALOADER.DISERED_CLASSES = [
     #     "Speech",
     #     "Music",
@@ -59,41 +59,85 @@ def read_config():
     #     "Gunshot, gunfire",
     # ]
 
-    # cfg.DATALOADER.DISERED_CLASSES = [
-    #     "Aircraft",
-    #     "Ambulance (siren)",
-    #     "Bicycle",
-    #     "Bird",
-    #     "Boom",
-    #     "Bus",
-    #     "Camera",
-    #     "Car",
-    #     "Cash register",
-    #     "Cat",
-    #     "Cattle, bovinae",
-    #     "Church bell",
-    #     "Clock",
-    #     "Dog",
-    #     "Mechanical fan",
-    #     "Fireworks",
-    #     "Goat",
-    #     "Gunshot, gunfire",
-    #     "Hammer",
-    #     "Horse",
-    #     "Motorcycle",
-    #     "Ocean",
-    #     "Pant",
-    #     "Pig",
-    #     "Printer",
-    #     "Rain",
-    #     "Sawing",
-    #     "Sewing machine",
-    #     "Skateboard",
-    #     "Stream",
-    #     "Thunderstorm",
-    #     "Train",
-    #     "Truck",
-    # ]
+    cfg.DATALOADER.DISERED_CLASSES = [
+        "Aircraft",
+        "Ambulance (siren)",
+        "Bicycle",
+        "Bird",
+        "Boom",
+        "Bus",
+        "Camera",
+        "Car",
+        "Cash register",
+        "Cat",
+        "Cattle, bovinae",
+        "Church bell",
+        "Clock",
+        "Dog",
+        "Mechanical fan",
+        "Fireworks",
+        "Goat",
+        "Gunshot, gunfire",
+        "Hammer",
+        "Horse",
+        "Motorcycle",
+        "Ocean",
+        "Pant",
+        "Pig",
+        "Printer",
+        "Rain",
+        "Sawing",
+        "Sewing machine",
+        "Skateboard",
+        "Stream",
+        "Thunderstorm",
+        "Train",
+        "Truck",
+    ]
+
+    # set wandb config
+    if cfg.GRAPH.NORMALIZE:
+        norml = "with_normalization_layers"
+    else:
+        norml = "without_normalization_layers"
+    cfg.MODEL.OUT_DIM = len(cfg.DATALOADER.DISERED_CLASSES)
+    cfg.WANDB.EXP_NAME = f"{cfg.SOLVER.ITERS_TO_ACCUMULATE}_grd_accu_batch_size_{cfg.DATALOADER.BATCH_SIZE}_{norml}"
+    if cfg.MODEL.AUDIO_BACKBONE.FINETUNE or cfg.MODEL.VIDEO_BACKBONE.FINETUNE:
+        without_ft = "with_ft"
+    else:
+        without_ft = "without_ft"
+    if cfg.SOLVER.MY_CLIP_GRADIENTS.ENABLED:
+        clip_grad = "with_grd_clip"
+    else:
+        clip_grad = "without_grd_clip"
+    if cfg.SOLVER.AMP.ENABLED:
+        amp = "_with_amp"
+    else:
+        amp = "_without_amp"
+    if cfg.TRAINING.LABEL_SMOOTHING != 0.0:
+        label_smoothing = "_with_label_smoothing"
+    else:
+        label_smoothing = ""
+    if cfg.TRAINING.L2_REGULARIZATION:
+        l2_reg = "_with_l2_reg"
+    else:
+        l2_reg = ""
+    if cfg.TRAINING.CLASS_WEIGHTS:
+        class_weights = "_with_class_weights"
+    else:
+        class_weights = ""
+    if cfg.TRAINING.NON_LINEAR_ACTIVATION != "":
+        act = f"_with_{cfg.TRAINING.NON_LINEAR_ACTIVATION}"
+    else:
+        act = ""
+    cfg.WANDB.GP_NAME = (
+        f"with_graph_model_33_classes_{clip_grad}_{without_ft}_{cfg.GRAPH.NUM_AUDIO_NODES}_audio_"
+        f"{cfg.GRAPH.NUM_VIDEO_NODES}_video{amp}{label_smoothing}"
+        f"{l2_reg}{class_weights}{act}"
+    )
+    cfg.WANDB.ID = get_random_string(
+        len(cfg.WANDB.EXP_NAME) + cfg.SOLVER.ITERS_TO_ACCUMULATE
+    )
 
     return cfg
 

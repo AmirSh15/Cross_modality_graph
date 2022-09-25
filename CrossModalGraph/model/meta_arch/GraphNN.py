@@ -12,11 +12,13 @@ from sklearn.metrics.pairwise import cosine_similarity
 from torch import nn
 from torch.nn.init import xavier_uniform_
 from torch_geometric.data import HeteroData
+from torch_geometric.nn import (BatchNorm, GATConv, GATv2Conv, GCNConv,
+                                GlobalAttention, GraphNorm, InstanceNorm,
+                                LayerNorm, Linear, PairNorm, SAGEConv,
+                                TransformerConv, global_max_pool,
+                                global_mean_pool)
 # from CrossModalGraph.model.GNN_models import GATConv
-from torch_geometric.nn import (GATConv, GATv2Conv, GCNConv, GlobalAttention,
-                                GraphNorm, InstanceNorm, LayerNorm, Linear,
-                                PairNorm, SAGEConv, TransformerConv,
-                                global_max_pool, global_mean_pool)
+from torch_geometric.utils.dropout import dropout_adj
 from torchaudio.pipelines import (WAV2VEC2_BASE, WAV2VEC2_LARGE,
                                   WAV2VEC2_LARGE_LV60K)
 from torchvision.models.video import R3D_18_Weights, r3d_18
@@ -29,10 +31,6 @@ from CrossModalGraph.model.utils import (HeteroConv, num_of_graphs,
 from CrossModalGraph.structures.instances import Instances
 from CrossModalGraph.utils.events import get_event_storage
 from CrossModalGraph.utils.utils import atten_dive_score
-
-# from torch_geometric.nn.glob.gmt import GraphMultisetTransformer
-
-
 
 __all__ = ["EndToEndHeteroGNN"]
 
@@ -73,8 +71,13 @@ class EndToEndHeteroGNN(nn.Module):
         self.loss = loss
         self.device = device
         self.out_dim = out_dim
+        self.normalize = normalize
         self.fusion_layers = np.array(cfg.GRAPH.FUSION_LAYERS) + num_layers
         self.residual = cfg.GRAPH.RESIDUAL
+        self.l2_reg = cfg.TRAINING.L2_REGULARIZATION
+        self.label_smoothing = cfg.TRAINING.LABEL_SMOOTHING
+        self.class_weights = cfg.TRAINING.CLASS_WEIGHTS
+        self.non_linear_act = cfg.TRAINING.NON_LINEAR_ACTIVATION
 
         self.num_aud_nodes = cfg.GRAPH.NUM_AUDIO_NODES
         self.num_vid_nodes = cfg.GRAPH.NUM_VIDEO_NODES
@@ -118,35 +121,43 @@ class EndToEndHeteroGNN(nn.Module):
 
             # check the layer type
             if i in self.fusion_layers:
-                audio_conv = video_conv = GCNConv(
+                # audio_conv = video_conv = GCNConv(
+                #     -1,
+                #     hidden_channels,
+                #     normalize=normalize,
+                #     add_self_loops=self_loops,
+                # )
+                audio_conv = video_conv = SAGEConv(
                     -1,
                     hidden_channels,
-                    normalize=normalize,
-                    add_self_loops=self_loops,
                 )
                 # audio_conv = video_conv = TransformerConv(-1, hidden_channels)
             else:
-                audio_conv = GCNConv(
+                # audio_conv = GCNConv(
+                #     -1,
+                #     hidden_channels,
+                #     normalize=normalize,
+                #     add_self_loops=self_loops,
+                # )
+                # video_conv = GCNConv(
+                #     -1,
+                #     hidden_channels,
+                #     normalize=normalize,
+                #     add_self_loops=self_loops,
+                # )
+                audio_conv = SAGEConv(
                     -1,
                     hidden_channels,
-                    normalize=normalize,
-                    add_self_loops=self_loops,
                 )
-                video_conv = GCNConv(
+                video_conv = SAGEConv(
                     -1,
                     hidden_channels,
-                    normalize=normalize,
-                    add_self_loops=self_loops,
                 )
 
             # define a heterogeneous conv layer
             conv = HeteroConv(
                 {
-                    # ('video', 'video-video', 'video'): GCNConv(-1, hidden_channels),
-                    # ('audio', 'audio-audio', 'audio'): GATConv((-1, -1), hidden_channels),
-                    # ('audio', 'audio-video', 'video'): SAGEConv((-1, -1), hidden_channels),
                     ("video", "video-video", "video"): video_conv,
-                    # ('video', 'video-video', 'video'): TransformerConv(-1, hidden_channels),
                     ("audio", "audio-audio", "audio"): audio_conv,
                     # the task is acoustics classification so we need to add the edges from video to audio
                     ("video", "video-audio", "audio"): GATConv(
@@ -167,8 +178,10 @@ class EndToEndHeteroGNN(nn.Module):
             self.convs.append(conv)
             self.Norm_layers.append(
                 {
-                    "audio": LayerNorm(hidden_channels).cuda(),
-                    "video": LayerNorm(hidden_channels).cuda(),
+                    # "audio": LayerNorm(hidden_channels).cuda(),
+                    # "video": LayerNorm(hidden_channels).cuda(),
+                    "audio": BatchNorm(hidden_channels).cuda(),
+                    "video": BatchNorm(hidden_channels).cuda(),
                 }
             )
 
@@ -346,6 +359,21 @@ class EndToEndHeteroGNN(nn.Module):
         #     storage.put_image(vis_name, vis_img)
         #     break  # only visualize one image in a batch
 
+    def _apply_adj(self, edge_index_dict):
+        """
+        Apply the adjacency matrix to the graph.
+
+        Args:
+            edge_index_dict (dict): dictionary of edge indices for audio-audio, audio-video, and video-video
+        Returns:
+            dict: perturbed dictionary of edge indices
+        """
+        for key, edge_index in edge_index_dict.items():
+            edge_index_dict[key] = dropout_adj(
+                edge_index=edge_index_dict[key], p=0.1, training=self.training
+            )
+        return edge_index_dict
+
     def graph_forward(self, x_dict, batches, batched_edges, ptr_audio, ptr_video):
 
         # feeding audio and video features to the graph model
@@ -356,14 +384,22 @@ class EndToEndHeteroGNN(nn.Module):
                     x_dict, edge_index_dict, ptr_audio, ptr_video, batches
                 )
             last_x_dict = x_dict
+            # apply convolution
             x_dict, _ = conv(x_dict, edge_index_dict)
-            x_dict = {key: x.relu() for key, x in x_dict.items()}
-            if self.training:
-                x_dict = {key: F.dropout(x, p=0.1) for key, x in x_dict.items()}
+            # apply normalization
             x_dict = {
-                key: norm_layer[key](x, batches[key]) for key, x in x_dict.items()
+                # key: norm_layer[key](x, batches[key]) for key, x in x_dict.items()
+                key: norm_layer[key](x)
+                for key, x in x_dict.items()
             }
-            # residual connection
+            # apply activation
+            x_dict = {key: x.relu() for key, x in x_dict.items()}
+            # apply dropout
+            x_dict = {
+                key: F.dropout(x, p=0.2, training=self.training)
+                for key, x in x_dict.items()
+            }
+            # aplpy residual connection
             if self.residual:
                 x_dict = {key: x + last_x_dict[key] for key, x in x_dict.items()}
 
@@ -379,14 +415,14 @@ class EndToEndHeteroGNN(nn.Module):
         )
         # graph_embed = self.graph_read_out_audio(x_dict["audio"], batches["audio"])
 
-        # bypassing the graph model
-        graph_embed = torch.cat(
-            [
-                self.graph_read_out_audio(x_dict["audio"], batches["audio"]),
-                self.graph_read_out_video(x_dict["video"], batches["video"]),
-            ],
-            dim=1,
-        )
+        # # bypassing the graph model
+        # graph_embed = torch.cat(
+        #     [
+        #         self.graph_read_out_audio(x_dict["audio"], batches["audio"]),
+        #         self.graph_read_out_video(x_dict["video"], batches["video"]),
+        #     ],
+        #     dim=1,
+        # )
 
         return graph_embed
 
@@ -457,48 +493,79 @@ class EndToEndHeteroGNN(nn.Module):
 
         return video_feats
 
-    def compute_loss_and_metrics(self, pred, batched_inputs):
+    def l2_regularization(self):
+        """
+        Compute the l2 norm of the model parameters.
+        """
+        l2_reg = torch.tensor(0.0).to(self.device)
+        for param in self.parameters():
+            l2_reg += torch.norm(param, p=2)
+        return l2_reg
+
+    def compute_loss_and_metrics(self, predictions, batched_inputs):
+        targets = (
+            F.one_hot(batched_inputs["numerical_label"], self.out_dim)
+            .type(torch.FloatTensor)
+            .to(self.device)
+        )
+
+        # optinally class weights
+        if self.class_weights:
+            class_weights = batched_inputs["class_weight"][0].to(self.device)
+        else:
+            class_weights = None
+
+        # optionally use activation function
+        if self.non_linear_act == "Sigmoid":
+            predictions = torch.sigmoid(predictions)
+        elif self.non_linear_act == "Softmax":
+            predictions = torch.softmax(predictions, dim=1)
+        elif self.non_linear_act == "LogSoftmax":
+            predictions = torch.nn.functional.log_softmax(predictions, dim=1)
+        elif self.non_linear_act == "LogSigmoid":
+            predictions = torch.nn.functional.logsigmoid(predictions)
+
         # compute loss
         classification_loss = {}
         if self.loss == "CrossEntropyLoss":
-            criterion = torch.nn.CrossEntropyLoss()
+            criterion = torch.nn.CrossEntropyLoss(
+                weight=class_weights, label_smoothing=self.label_smoothing
+            )
             classification_loss["cls_loss"] = criterion(
-                pred, batched_inputs["numerical_label"].to(self.device)
+                predictions, batched_inputs["numerical_label"].to(self.device)
             )
         elif self.loss == "FocalLoss":
             classification_loss["cls_loss"] = focal_loss(
-                pred,
+                predictions,
                 batched_inputs["numerical_label"].to(self.device),
                 alpha=0.5,
                 gamma=2.0,
                 reduction="mean",
             )
-        target = (
-            F.one_hot(batched_inputs["numerical_label"], self.out_dim)
-            .type(torch.FloatTensor)
-            .to(self.device)
-        )
-        # classification_loss['cls_loss'] = F.binary_cross_entropy(pred, target)
+        if self.l2_reg:
+            l2_loss = +0.5 * self.l2_regularization()
+
+        # classification_loss['cls_loss'] = F.binary_cross_entropy(predictions, target)
 
         # computing average precision
         # try:
         #     average_precision = metrics.average_precision_score(
         #         target.cpu().float().numpy(),
-        #         pred.detach().cpu().float().numpy(),
+        #         predictions.detach().cpu().float().numpy(),
         #         average=None,
         #     )
         # except ValueError:
         #     average_precision = np.array([np.nan] * self.out_dim)
         average_precision = np.array([np.nan] * self.out_dim)
         # try:
-        #     roc = metrics.roc_auc_score(batched_inputs['numerical_label'].numpy(), pred.softmax(1).numpy(),
+        #     roc = metrics.roc_auc_score(batched_inputs['numerical_label'].numpy(), predictions.softmax(1).numpy(),
         #     multi_class='ovr' )
         # except ValueError:
         #     roc = np.array([np.nan] * 527)
 
         # computing accuracy
         acc = (
-            torch.max(pred, 1)[1].cpu() == batched_inputs["numerical_label"]
+            torch.max(predictions, 1)[1].cpu() == batched_inputs["numerical_label"]
         ).sum().item() / batched_inputs["numerical_label"].shape[0]
 
         if self.vis_period > 0:
@@ -508,7 +575,9 @@ class EndToEndHeteroGNN(nn.Module):
 
         losses = {}
         losses.update(classification_loss)
-        # losses.update(proposal_losses)
+        if self.l2_reg:
+            losses.update({"l2_loss": l2_loss})
+
         metric = {}
         metric["mAP"] = torch.from_numpy(
             np.asarray(
@@ -577,8 +646,9 @@ class EndToEndHeteroGNN(nn.Module):
         video_feats = self.video_head_forward(video)
 
         # apply norm layers
-        # audio_feats = self.pre_norm_audio(audio_feats)
-        # video_feats = self.pre_norm_video(video_feats)
+        if self.normalize:
+            audio_feats = self.pre_norm_audio(audio_feats)
+            video_feats = self.pre_norm_video(video_feats)
 
         # update graph data
         batched_x["audio"] = audio_feats.flatten(start_dim=0, end_dim=1)
@@ -671,8 +741,9 @@ class EndToEndHeteroGNN(nn.Module):
         video_feats = self.video_head_forward(video)
 
         # apply norm layers
-        audio_feats = self.pre_norm_audio(audio_feats)
-        video_feats = self.pre_norm_video(video_feats)
+        if self.normalize:
+            audio_feats = self.pre_norm_audio(audio_feats)
+            video_feats = self.pre_norm_video(video_feats)
 
         # update graph data
         batched_x["audio"] = audio_feats.flatten(start_dim=0, end_dim=1)

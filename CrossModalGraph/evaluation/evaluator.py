@@ -189,12 +189,12 @@ def inference_on_dataset(
                         f"Total: {total_seconds_per_iter:.4f} s/iter. "
                         f"ETA={eta}"
                     ),
-                    n=5,
+                    n=60,
                 )
             start_data_time = time.perf_counter()
 
-            if idx == 50:
-                break
+            # if idx == 50:
+            #     break
 
     # Measure the time only for this worker (before the synchronization barrier)
     total_time = time.perf_counter() - start_time

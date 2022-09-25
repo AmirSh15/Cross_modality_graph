@@ -403,7 +403,7 @@ class AMPTrainer(SimpleTrainer):
             assert not (model.device_ids and len(model.device_ids) > 1), unsupported
         assert not isinstance(model, DataParallel), unsupported
 
-        super().__init__(model, data_loader, optimizer)
+        super().__init__(model, data_loader, optimizer, config)
 
         if grad_scaler is None:
             from torch.cuda.amp import GradScaler
@@ -438,9 +438,6 @@ class AMPTrainer(SimpleTrainer):
         # self.optimizer.zero_grad()
         self.grad_scaler.scale(losses).backward()
 
-        # Unscales the gradients of optimizer's assigned params in-place
-        self.grad_scaler.unscale_(self.optimizer)
-
         # compute gradient norm
         grad_norm = gradient_utils(self.model, self.grd_clip)
 
@@ -453,6 +450,9 @@ class AMPTrainer(SimpleTrainer):
 
         if (self.accumulative_counter + 1) % self.iters_to_accumulate == 0:
             self.accumulative_counter = 0
+
+            # Unscales the gradients of optimizer's assigned params in-place
+            self.grad_scaler.unscale_(self.optimizer)
 
             # Unscales gradients and calls
             # or skips optimizer.step()
@@ -536,10 +536,37 @@ def gradient_utils(model, grd_clip: bool):
         )
 
     return {
-        "audio_head_grad_norm": audio_head_grad_norm,
-        "video_head_grad_norm": video_head_grad_norm,
-        "total_grad_norm": total_grad_norm,
-        "clipped_total_grad_norm": clipped_total_grad_norm,
-        "clipped_audio_head_grad_norm": clipped_audio_head_grad_norm,
-        "clipped_video_head_grad_norm": clipped_video_head_grad_norm,
+        "audio_head_grad_norm": audio_head_grad_norm
+        if not (
+            np.isnan(audio_head_grad_norm.item())
+            and np.isinf(audio_head_grad_norm.item())
+        )
+        else torch.tensor(0.0),
+        "video_head_grad_norm": video_head_grad_norm
+        if not (
+            np.isnan(video_head_grad_norm.item())
+            and np.isinf(video_head_grad_norm.item())
+        )
+        else torch.tensor(0.0),
+        "total_grad_norm": total_grad_norm
+        if not (np.isnan(total_grad_norm.item()) and np.isinf(total_grad_norm.item()))
+        else torch.tensor(0.0),
+        "clipped_total_grad_norm": clipped_total_grad_norm
+        if not (
+            np.isnan(clipped_total_grad_norm.item())
+            and np.isinf(clipped_total_grad_norm.item())
+        )
+        else torch.tensor(0.0),
+        "clipped_audio_head_grad_norm": clipped_audio_head_grad_norm
+        if not (
+            np.isnan(clipped_audio_head_grad_norm.item())
+            and np.isinf(clipped_audio_head_grad_norm.item())
+        )
+        else torch.tensor(0.0),
+        "clipped_video_head_grad_norm": clipped_video_head_grad_norm
+        if not (
+            np.isnan(clipped_video_head_grad_norm.item())
+            and np.isinf(clipped_video_head_grad_norm.item())
+        )
+        else torch.tensor(0.0),
     }

@@ -2,10 +2,12 @@ import itertools
 import os
 import time
 import warnings
+from collections import defaultdict
 
 import numpy as np
 import torch
 import torchvision
+from sklearn.utils import compute_class_weight
 from torch.utils.data import DataLoader, Dataset
 from torch_geometric.data import HeteroData
 from torch_geometric.loader import DataLoader as GraphDataLoader
@@ -108,6 +110,9 @@ class AudioSetGraphDataset(Dataset):
 
         self._init_graph_param_(graph_config=config.GRAPH)
 
+        # compute class weights
+        self.class_weights = self._compute_class_weights()
+
     def _get_video_files(self, root):
         # pick up all the video files in sub-folders in the root directory
         video_files = []
@@ -173,6 +178,16 @@ class AudioSetGraphDataset(Dataset):
             np.random.shuffle(self.hop_prob_list_comp)
 
             self.hop_prob_list = self.hop_prob_list + self.hop_prob_list_comp
+
+    def _compute_class_weights(self):
+        # compute class weights
+        class_weights = compute_class_weight(
+            class_weight="balanced",
+            classes=np.unique(self.numerical_labels),
+            y=self.numerical_labels,
+        )
+        class_weights = torch.tensor(class_weights, dtype=torch.float)
+        return class_weights
 
     def _create_init_graph_(self):
         if not self.dynamic and len(self.Graph_memory) != 0:
@@ -475,6 +490,7 @@ class AudioSetGraphDataset(Dataset):
             "audio_len": audio_len,
             "video_len": video_len,
             "numerical_label": self.label_dict[self.labels[idx]],
+            "class_weight": self.class_weights,  # [self.label_dict[self.labels[idx]]],
         }
 
         # create initial heterogeneous graph

@@ -22,7 +22,6 @@ from CrossModalGraph.utils.events import get_event_storage
 # from torch_geometric.nn.glob.gmt import GraphMultisetTransformer
 
 
-
 __all__ = ["ResNet1D"]
 
 
