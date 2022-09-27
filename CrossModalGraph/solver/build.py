@@ -13,6 +13,7 @@ from fvcore.common.param_scheduler import (CosineParamScheduler,
 from CrossModalGraph.configs.config import CfgNode
 from CrossModalGraph.train_utils.lr_scheduler import (LRMultiplier,
                                                       WarmupParamScheduler)
+from CrossModalGraph.utils.utils import group_wise_lr
 
 _GradientClipperInput = Union[torch.Tensor, Iterable[torch.Tensor]]
 _GradientClipper = Callable[[_GradientClipperInput], None]
@@ -117,20 +118,48 @@ def build_optimizer(cfg: CfgNode, model: torch.nn.Module) -> torch.optim.Optimiz
     """
     Build an optimizer from config.
     """
-    params = get_default_optimizer_params(
-        model,
-        base_lr=cfg.SOLVER.BASE_LR,
-        weight_decay_norm=cfg.SOLVER.WEIGHT_DECAY_NORM,
-        bias_lr_factor=cfg.SOLVER.BIAS_LR_FACTOR,
-        weight_decay_bias=cfg.SOLVER.WEIGHT_DECAY_BIAS,
-    )
-    return maybe_add_gradient_clipping(cfg, torch.optim.SGD)(
-        params,
-        lr=cfg.SOLVER.BASE_LR,
-        momentum=cfg.SOLVER.MOMENTUM,
-        nesterov=cfg.SOLVER.NESTEROV,
-        weight_decay=cfg.SOLVER.WEIGHT_DECAY,
-    )
+    if cfg.SOLVER.SAME_LR:
+        params = get_default_optimizer_params(
+            model,
+            base_lr=cfg.SOLVER.BASE_LR,
+            weight_decay_norm=cfg.SOLVER.WEIGHT_DECAY_NORM,
+            bias_lr_factor=cfg.SOLVER.BIAS_LR_FACTOR,
+            weight_decay_bias=cfg.SOLVER.WEIGHT_DECAY_BIAS,
+        )
+    else:
+        grp = {"video_head": {"lr": cfg.SOLVER.BASE_LR/10},
+               "audio_head": {"lr": cfg.SOLVER.BASE_LR/10},
+               "lr": cfg.SOLVER.BASE_LR}
+        params, _ = group_wise_lr(model=model, group_lr_conf=grp)
+
+    if cfg.SOLVER.OPTIM == "SGD":
+        return maybe_add_gradient_clipping(cfg, torch.optim.SGD)(
+            params,
+            lr=cfg.SOLVER.BASE_LR,
+            momentum=cfg.SOLVER.MOMENTUM,
+            nesterov=cfg.SOLVER.NESTEROV,
+            weight_decay=cfg.SOLVER.WEIGHT_DECAY,
+        )
+    elif cfg.SOLVER.OPTIM == "Adam":
+        return maybe_add_gradient_clipping(cfg, torch.optim.Adam)(
+            params,
+            lr=cfg.SOLVER.BASE_LR,
+            betas=(cfg.SOLVER.ADAM_BETA1, cfg.SOLVER.ADAM_BETA2),
+            eps=cfg.SOLVER.ADAM_EPS,
+            weight_decay=cfg.SOLVER.WEIGHT_DECAY,
+        )
+    elif cfg.SOLVER.OPTIM == "AdamW":
+        return maybe_add_gradient_clipping(cfg, torch.optim.AdamW)(
+            params,
+            lr=cfg.SOLVER.BASE_LR,
+            betas=(cfg.SOLVER.ADAM_BETA1, cfg.SOLVER.ADAM_BETA2),
+            eps=cfg.SOLVER.ADAM_EPS,
+            weight_decay=cfg.SOLVER.WEIGHT_DECAY,
+        )
+    else:
+        raise ValueError("Unknown optimizer: {}".format(cfg.SOLVER.OPTIM))
+
+
 
 
 def get_default_optimizer_params(
@@ -228,28 +257,37 @@ def build_lr_scheduler(
     """
     name = cfg.SOLVER.LR_SCHEDULER_NAME
 
-    if name == "WarmupMultiStepLR":
-        steps = [x for x in cfg.SOLVER.STEPS if x <= cfg.SOLVER.MAX_ITER]
-        if len(steps) != len(cfg.SOLVER.STEPS):
-            logger = logging.getLogger(__name__)
-            logger.warning(
-                "SOLVER.STEPS contains values larger than SOLVER.MAX_ITER. "
-                "These values will be ignored."
-            )
-        sched = MultiStepParamScheduler(
-            values=[cfg.SOLVER.GAMMA**k for k in range(len(steps) + 1)],
-            milestones=steps,
-            num_updates=cfg.SOLVER.MAX_ITER,
+    if name == "CosineAnnealingLR":
+        return torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=cfg.SOLVER.LR_SCHEDULER_T_MAX
         )
-    elif name == "WarmupCosineLR":
-        sched = CosineParamScheduler(1, 0)
+    elif name == "CosineAnnealingWarmRestarts":
+        return torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+            optimizer, T_0=cfg.SOLVER.LR_SCHEDULER_T_MAX, T_mult=1,
+        )
     else:
-        raise ValueError("Unknown LR scheduler: {}".format(name))
+        if name == "WarmupMultiStepLR":
+            steps = [x for x in cfg.SOLVER.STEPS if x <= cfg.SOLVER.MAX_ITER]
+            if len(steps) != len(cfg.SOLVER.STEPS):
+                logger = logging.getLogger(__name__)
+                logger.warning(
+                    "SOLVER.STEPS contains values larger than SOLVER.MAX_ITER. "
+                    "These values will be ignored."
+                )
+            sched = MultiStepParamScheduler(
+                values=[cfg.SOLVER.GAMMA**k for k in range(len(steps) + 1)],
+                milestones=steps,
+                num_updates=cfg.SOLVER.MAX_ITER,
+            )
+        elif name == "WarmupCosineLR":
+            sched = CosineParamScheduler(1, 0)
+        else:
+            raise ValueError("Unknown LR scheduler: {}".format(name))
 
-    sched = WarmupParamScheduler(
-        sched,
-        cfg.SOLVER.WARMUP_FACTOR,
-        min(cfg.SOLVER.WARMUP_ITERS / cfg.SOLVER.MAX_ITER, 1.0),
-        cfg.SOLVER.WARMUP_METHOD,
-    )
-    return LRMultiplier(optimizer, multiplier=sched, max_iter=cfg.SOLVER.MAX_ITER)
+        sched = WarmupParamScheduler(
+            sched,
+            cfg.SOLVER.WARMUP_FACTOR,
+            min(cfg.SOLVER.WARMUP_ITERS / cfg.SOLVER.MAX_ITER, 1.0),
+            cfg.SOLVER.WARMUP_METHOD,
+        )
+        return LRMultiplier(optimizer, multiplier=sched, max_iter=cfg.SOLVER.MAX_ITER)

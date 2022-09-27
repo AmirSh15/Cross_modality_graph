@@ -33,13 +33,18 @@ GRAPH:
   NORMALIZE: True
   SELF_LOOPS: False
   RESIDUAL: True
+  ADJACENCY_DROPOUT: 0.2
+  GRAPH_DROPOUT: 0.2
   FUSION_LAYERS: [-1]
-  NUM_VIDEO_NODES: 5
+  DISTANCE: "cosine"
+#  NUM_VIDEO_NODES: 40
 #  VIDEO_SEGMENT_LENGTH: 250
-  VIDEO_SEGMENT_LENGTH: 2000
-  NUM_AUDIO_NODES: 10
+  NUM_VIDEO_NODES: 10
+  VIDEO_SEGMENT_LENGTH: 1000
+#  NUM_AUDIO_NODES: 100
 #  AUDIO_SEGMENT_LENGTH: 960
-  AUDIO_SEGMENT_LENGTH: 960
+  NUM_AUDIO_NODES: 20
+  AUDIO_SEGMENT_LENGTH: 480
 DATASETS:
   TRAIN_RATIO: 0.7
   EVAL_RATIO: 0.1
@@ -54,11 +59,21 @@ DATALOADER:
   STRATIFIED_SPLIT: True
   NUM_WORKERS: 6
 SOLVER:
+  OPTIM: "Adam"
   BASE_LR: 0.0005
-#  STEPS: (1500,)
+# consider same learning rate for both audio, video and graph if True else will have 1/10 of the base learning rate for audio and video models
+  SAME_LR: False
+# learning rate scheduler (options: "CosineAnnealingLR", "CosineAnnealingWarmRestarts", "WarmupMultiStepLR)
+  LR_SCHEDULER_NAME: "CosineAnnealingWarmRestarts"
+# parameters for CosineAnnealingLR
+  LR_SCHEDULER_T_MAX: 2500
+# parameters for CosineAnnealingWarmRestarts
+  LR_SCHEDULER_T_MULT: 2
+# parameters for WarmupMultiStepLR
+  WARMUP_ITERS: 1000
+#  Steps for decreasing lr for 1/10. The way you set: (1500,)
   STEPS: ()
   MAX_ITER: 100000
-  WARMUP_ITERS: 1000
 # number of epochs to be accumulated before updating the parameters
   ITERS_TO_ACCUMULATE: 2
 # option to enable 16-bit training
@@ -67,7 +82,7 @@ SOLVER:
   MY_CLIP_GRADIENTS:
     ENABLED: True
   CLIP_GRADIENTS:
-    CLIP_VALUE: 10.0
+    CLIP_VALUE: 1.0
 INPUT:
   MIN_SIZE_TRAIN: (640, 672, 704, 736, 768, 800)
 VERSION: 0

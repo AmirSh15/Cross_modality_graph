@@ -6,6 +6,7 @@ import random
 import string
 import sys
 from collections.abc import Mapping
+from typing import Dict
 
 import cv2
 import numpy as np
@@ -34,6 +35,7 @@ __all__ = [
     "init_wab",
     "get_random_string",
     "setup_random_seed",
+    "group_wise_lr",
 ]
 
 
@@ -143,12 +145,12 @@ def read_config():
 
 
 def init_wab(
-    wab_config_path,
-    model_config,
-    entity,
-    project_name,
-    key,
-    config,
+        wab_config_path,
+        model_config,
+        entity,
+        project_name,
+        key,
+        config,
 ):
     import wandb
 
@@ -277,7 +279,6 @@ def imshow(img, name="image"):
 
 
 def video_reader(video_path, transform=None, transform_cuda=None):
-
     img_array = []
     try:
         cap = cv2.VideoCapture(video_path)
@@ -370,7 +371,7 @@ class DetectionCheckpointer(Checkpointer):
             with PathManager.open(filename, "rb") as f:
                 data = torch.load(f)
             assert (
-                "model_state" in data
+                    "model_state" in data
             ), f"Cannot load .pyth file {filename}; pycls checkpoints must contain 'model_state'."
             model_state = {
                 k: v
@@ -487,3 +488,60 @@ def atten_dive_score(attn_vec, edge_index=None):
         return torch.stack(
             [torch.std(attn_w[idx]).mean() for idx in range(len(attn_w))]
         ).mean()
+
+
+def group_wise_lr(model, group_lr_conf: Dict, path=""):
+    """
+    Refer https://pytorch.org/docs/master/optim.html#per-parameter-options
+
+
+    torch.optim.SGD([
+        {'params': model.base.parameters()},
+        {'params': model.classifier.parameters(), 'lr': 1e-3}
+    ], lr=1e-2, momentum=0.9)
+
+
+    to
+
+
+    cfg = {"classifier": {"lr": 1e-3},
+           "lr":1e-2, "momentum"=0.9}
+    confs, names = group_wise_lr(model, cfg)
+    torch.optim.SGD([confs], lr=1e-2, momentum=0.9)
+
+
+
+    :param model:
+    :param group_lr_conf:
+    :return:
+    """
+    assert type(group_lr_conf) == dict
+    confs = []
+    nms = []
+    for kl, vl in group_lr_conf.items():
+        assert type(kl) == str
+        assert type(vl) == dict or type(vl) == float or type(vl) == int
+
+        if type(vl) == dict:
+            assert hasattr(model, kl)
+            cfs, names = group_wise_lr(getattr(model, kl), vl, path=path + kl + ".")
+            confs.extend(cfs)
+            names = list(map(lambda n: kl + "." + n, names))
+            nms.extend(names)
+
+    primitives = {kk: vk for kk, vk in group_lr_conf.items() if type(vk) == float or type(vk) == int}
+    remaining_params = [(k, p) for k, p in model.named_parameters() if k not in nms]
+    if len(remaining_params) > 0:
+        names, params = zip(*remaining_params)
+        conf = dict(params=params, **primitives)
+        confs.append(conf)
+        nms.extend(names)
+
+    plen = sum([len(list(c["params"])) for c in confs])
+    assert len(list(model.parameters())) == plen
+    assert set(list(zip(*model.named_parameters()))[0]) == set(nms)
+    assert plen == len(nms)
+    if path == "":
+        for c in confs:
+            c["params"] = (n for n in c["params"])
+    return confs, nms

@@ -72,12 +72,15 @@ class EndToEndHeteroGNN(nn.Module):
         self.device = device
         self.out_dim = out_dim
         self.normalize = normalize
+        self.adj_dropout = cfg.GRAPH.ADJACENCY_DROPOUT
+        self.graph_dropout = cfg.GRAPH.GRAPH_DROPOUT
         self.fusion_layers = np.array(cfg.GRAPH.FUSION_LAYERS) + num_layers
         self.residual = cfg.GRAPH.RESIDUAL
         self.l2_reg = cfg.TRAINING.L2_REGULARIZATION
         self.label_smoothing = cfg.TRAINING.LABEL_SMOOTHING
         self.class_weights = cfg.TRAINING.CLASS_WEIGHTS
         self.non_linear_act = cfg.TRAINING.NON_LINEAR_ACTIVATION
+        self.mat_graph_dist = cfg.GRAPH.DISTANCE
 
         self.num_aud_nodes = cfg.GRAPH.NUM_AUDIO_NODES
         self.num_vid_nodes = cfg.GRAPH.NUM_VIDEO_NODES
@@ -194,6 +197,8 @@ class EndToEndHeteroGNN(nn.Module):
         # define norm layers
         self.pre_norm_audio = nn.LayerNorm([self.num_aud_nodes, hidden_channels]).cuda()
         self.pre_norm_video = nn.LayerNorm([self.num_vid_nodes, hidden_channels]).cuda()
+        # self.pre_norm_audio = nn.BatchNorm(hidden_channels).cuda()
+        # self.pre_norm_video = nn.BatchNorm(hidden_channels).cuda()
 
         # define output layer
         feat_dim = 2 * hidden_channels
@@ -283,8 +288,9 @@ class EndToEndHeteroGNN(nn.Module):
                 first_video_idx = ptr_video[0]
             else:
                 dist = pairwise_distances(
-                    audio_feat[first_audio_idx:last_audio_idx],
-                    video_feat[first_video_idx:last_video_idx],
+                    x=audio_feat[first_audio_idx:last_audio_idx],
+                    y=video_feat[first_video_idx:last_video_idx],
+                    type=self.mat_graph_dist,
                 )
                 knn_video = dist.topk(k, largest=False, dim=0).indices
                 knn_audio = dist.topk(k, largest=False, dim=1).indices
@@ -359,7 +365,7 @@ class EndToEndHeteroGNN(nn.Module):
         #     storage.put_image(vis_name, vis_img)
         #     break  # only visualize one image in a batch
 
-    def _apply_adj(self, edge_index_dict):
+    def _apply_adj_dropout(self, edge_index_dict):
         """
         Apply the adjacency matrix to the graph.
 
@@ -370,11 +376,15 @@ class EndToEndHeteroGNN(nn.Module):
         """
         for key, edge_index in edge_index_dict.items():
             edge_index_dict[key] = dropout_adj(
-                edge_index=edge_index_dict[key], p=0.1, training=self.training
-            )
+                edge_index=edge_index_dict[key], p=self.adj_dropout, training=self.training
+            )[0]
         return edge_index_dict
 
     def graph_forward(self, x_dict, batches, batched_edges, ptr_audio, ptr_video):
+
+        # apply adj dropout
+        if self.adj_dropout != 0 and self.training:
+            batched_edges = self._apply_adj_dropout(batched_edges)
 
         # feeding audio and video features to the graph model
         edge_index_dict = batched_edges
@@ -395,10 +405,11 @@ class EndToEndHeteroGNN(nn.Module):
             # apply activation
             x_dict = {key: x.relu() for key, x in x_dict.items()}
             # apply dropout
-            x_dict = {
-                key: F.dropout(x, p=0.2, training=self.training)
-                for key, x in x_dict.items()
-            }
+            if self.graph_dropout != 0:
+                x_dict = {
+                    key: F.dropout(x, p=self.graph_dropout, training=self.training)
+                    for key, x in x_dict.items()
+                }
             # aplpy residual connection
             if self.residual:
                 x_dict = {key: x + last_x_dict[key] for key, x in x_dict.items()}
@@ -756,6 +767,7 @@ class EndToEndHeteroGNN(nn.Module):
         batched_x["audio"] = audio_feats.flatten(start_dim=0, end_dim=1)
         batched_x["video"] = video_feats.flatten(start_dim=0, end_dim=1)
 
+        # apply graph model
         graph_embed = self.graph_forward(
             x_dict=batched_x,
             batches=batches,

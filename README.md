@@ -1,14 +1,14 @@
-# Visually-aware Acoustic Event Detection using Heterogeneous Graphs
+# Crossmodal Graph Learning for Acoustic Event Classification
 
 <br>
 
-**Jun 26, 2022**
+**Sep 26, 2022**
 * First release of the project.
 
 <br>
 
 <img src="./docs/1.png" align="center"/>
-In this project, we employ heterogeneous graphs to explicitly capture the spatial and temporal relationships between the modalities and represent detailed information of the underlying signal. Using heterogeneous graph approaches to address the task of visually-aware acoustic event classification, which serves as a compact, efficient and scalable way to represent data in the form of graphs. Through heterogeneous graphs, we show efficiently modeling of intra- and inter-modality relationships both at spatial and temporal scales. Our model can easily be adapted to different scales of events through relevant hyperparameters.
+In this project, we employ and end-to-end heterogeneous graphs to explicitly capture the spatial and temporal relationships between the modalities and represent detailed information of the underlying signal. Using heterogeneous graph approaches to address the task of visually-aware acoustic event classification, which serves as a compact, efficient and scalable way to represent data in the form of graphs. Through heterogeneous graphs, we show efficiently modeling of intra- and inter-modality relationships both at spatial and temporal scales. Our model can easily be adapted to different scales of events through relevant hyperparameters.
 ## Dependency installation
 
 The code was successfully built and run with these versions:
@@ -38,23 +38,24 @@ scikit-learn 1.0.2
 
 ## Preprocessing Data
 
-The AudioSet dataset is downloaded using this [repository](https://github.com/AmirSh15/AudioSet_downloader). For feature extraction part, [CoCLR](https://github.com/TengdaHan/CoCLR) (only need to put _CoCLR-ucf101-rgb-128-s3d-ep182.tar_ pretrained model in _pretrained_models_ directory) and [VGGish](https://github.com/harritaylor/torchvggish) (need to installed separately) is employed for video and audio correspondigly. 
-For feature extraction, use code in _utils/Feature_ext.py_ and _Merge_extracted_features.py_.
-
-Note: you can download the processed data from [here](https://drive.google.com/file/d/1_3H_wByS-cSLLG7vrhgfvdzCnjaXJ2ui/view?usp=sharing) and put in this directory:
+The AudioSet dataset is downloaded using this [repository](https://github.com/AmirSh15/AudioSet_downloader). 
 
 ```
 /data/
   AudioSet/
     train/
         Output_clip_len_0.25_audio_101/
-            AudioSet_embedds_A capella.h5
-            AudioSet_embedds_Accelerating, revving, vroom.h5
+            A capella/
+                video_952_start_50_end_60.mp4
+                ...
+            Accelerating, revving, vroom/
             ...
     eval/
         Output_clip_len_0.25_audio_101/
-            AudioSet_embedds_A capella.h5
-            AudioSet_embedds_Accelerating, revving, vroom.h5
+            A capella/
+                video_213_start_30_end_40.mp4
+                ...
+            Accelerating, revving, vroom/
             ...
 ```
 
@@ -68,59 +69,89 @@ You can config the model and training parameters in _configs/AudioSey.yaml_.
 
 ```
 MODEL:
-  META_ARCHITECTURE: "HeteroGNN"
+  META_ARCHITECTURE: "EndToEndHeteroGNN"
   AUDIO_BACKBONE:
-    NAME: "Vggish"
+    NAME: "WAV2VEC2_BASE"
     PRETRAINED_ON: ""
+    FINETUNE: True
   VIDEO_BACKBONE:
-    NAME: "CoCLR"
+    NAME: "r3d_18"
     PRETRAINED_ON: ""
-  IMAGE_BACKBONE:
-    NAME: "Resnext"
-    PRETRAINED_ON: "ImageNet"
+    FINETUNE: True
   HIDDEN_CHANNELS: 512
   NUM_LAYERS: 4
 TRAINING:
-  LOSS: "FocalLoss"
+  LOSS: "CrossEntropyLoss"
+  TRAIN_PLOT_PERIOD: 100
+  L2_REGULARIZATION: False
+  LABEL_SMOOTHING: 0.3
+  CLASS_WEIGHTS: True
+  NON_LINEAR_ACTIVATION: ""
 GRAPH:
   DYNAMIC: False
-#  SPAN_OVER_TIME_AUDIO: 5
-#  AUDIO_DILATION: 3
-#  SPAN_OVER_TIME_VIDEO: 3
-#  VIDEO_DILATION: 2
-#  SPAN_OVER_TIME_BETWEEN: 6
-  SPAN_OVER_TIME_AUDIO: 6
-  AUDIO_DILATION: 3
-  SPAN_OVER_TIME_VIDEO: 4
-  VIDEO_DILATION: 4
-  SPAN_OVER_TIME_BETWEEN: 3
-  NORMALIZE: False
+  SPAN_OVER_TIME_AUDIO: 2
+  AUDIO_DILATION: 1
+  SPAN_OVER_TIME_VIDEO: 1
+  VIDEO_DILATION: 1
+  SPAN_OVER_TIME_BETWEEN: 2
+  NORMALIZE: True
   SELF_LOOPS: False
-  FUSION_LAYERS: []
+  RESIDUAL: True
+  ADJACENCY_DROPOUT: 0.2
+  GRAPH_DROPOUT: 0.2
+  FUSION_LAYERS: [-1]
+  DISTANCE: "cosine"
+  NUM_VIDEO_NODES: 10
+  VIDEO_SEGMENT_LENGTH: 1000
+  NUM_AUDIO_NODES: 20
+  AUDIO_SEGMENT_LENGTH: 480
 DATASETS:
   TRAIN_RATIO: 0.7
   EVAL_RATIO: 0.1
   TEST_RATIO: 0.2
-#  TRAIN_PATH: 'data/AudioSet/train/Output_clip_len_1.0_audio_10/AudioSet_embedds_all.h5'
-  TRAIN_PATH: 'data/AudioSet/train/Output_clip_len_0.25_audio_101/AudioSet_embedds_all.h5'
-  TEST_PATH: 'data/AudioSet/eval/Output_clip_len_0.25_audio_101/AudioSet_embedds_all.h5'
-#  TEST_PATH: 'data/AudioSet/eval/Output_clip_len_1.0_audio_10/AudioSet_embedds_all.h5'
+  TRAIN_PATH: "Cross_modality_graph/data/AudioSet/train"
+  TEST_PATH: "Cross_modality_graph/data/AudioSet/eval"
 TEST:
-  MAX_PATIENCE: 5
-  EVAL_PERIOD: 250
+  MAX_PATIENCE: 3
+  EVAL_PERIOD: 2500
 DATALOADER:
-  BATCH_SIZE: 32
+  BATCH_SIZE: 2
   STRATIFIED_SPLIT: True
+  NUM_WORKERS: 6
 SOLVER:
-  BASE_LR: 0.005
-#  STEPS: (1500, 3200)
+  OPTIM: "Adam"
+  BASE_LR: 0.0005
+# consider same learning rate for both audio, video and graph if True else will have 1/10 of the base learning rate for audio and video models
+  SAME_LR: False
+# learning rate scheduler (options: "CosineAnnealingLR", "CosineAnnealingWarmRestarts", "WarmupMultiStepLR)
+  LR_SCHEDULER_NAME: "CosineAnnealingWarmRestarts"
+# parameters for CosineAnnealingLR
+  LR_SCHEDULER_T_MAX: 2500
+# parameters for CosineAnnealingWarmRestarts
+  LR_SCHEDULER_T_MULT: 2
+# parameters for WarmupMultiStepLR
+  WARMUP_ITERS: 1000
+#  Steps for decreasing lr for 1/10. The way you set: (1500,)
   STEPS: ()
   MAX_ITER: 100000
-  WARMUP_ITERS: 1000
+# number of epochs to be accumulated before updating the parameters
+  ITERS_TO_ACCUMULATE: 2
+# option to enable 16-bit training
+  AMP:
+    ENABLED: False
+  MY_CLIP_GRADIENTS:
+    ENABLED: True
+  CLIP_GRADIENTS:
+    CLIP_VALUE: 1.0
 INPUT:
   MIN_SIZE_TRAIN: (640, 672, 704, 736, 768, 800)
 VERSION: 0
 SEED: 1
+WANDB:
+  PROJECT_NAME: "CrossModalGraph"
+  ENABLED: True
+  CONFIG_PATH: "configs/wandb_config.yaml"
+  PERIOD: 100
 ```
 
 <br>

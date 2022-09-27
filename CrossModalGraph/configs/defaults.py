@@ -173,8 +173,14 @@ _C.GRAPH.NORMALIZE = True
 _C.GRAPH.SELF_LOOPS = True
 # Add residual connections between the graph layers
 _C.GRAPH.RESIDUAL = True
+# Add adjacency dropout (0.0 to disable)
+_C.GRAPH.ADJACENCY_DROPOUT = 0.0
+# Add graph dropout (0.0 to disable)
+_C.GRAPH.GRAPH_DROPOUT = 0.0
 # Add fusion layers
 _C.GRAPH.FUSION_LAYERS = []
+# Add the type of distance for matching graph construction
+_C.GRAPH.DISTANCE = "cosine" # "euclidean" or "cosine"
 # Add number of audio and video nodes
 _C.GRAPH.NUM_AUDIO_NODES = 10
 _C.GRAPH.NUM_VIDEO_NODES = 10
@@ -208,7 +214,19 @@ _C.TRAINING.NON_LINEAR_ACTIVATION = (
 _C.SOLVER = CN()
 
 # See detectron2/solver/build.py for LR scheduler options
-_C.SOLVER.LR_SCHEDULER_NAME = "WarmupMultiStepLR"
+_C.SOLVER.LR_SCHEDULER_NAME = "WarmupMultiStepLR" # "CosineAnnealingLR", "WarmupMultiStepLR"
+_C.SOLVER.LR_SCHEDULER_T_MAX = 1000
+_C.SOLVER.LR_SCHEDULER_T_MULT = 1
+
+_C.SOLVER.OPTIM = "SGD" # "SGD", "Adam", "AdamW"
+
+# Add Adam optimizer params
+_C.SOLVER.ADAM_BETA1 = 0.9
+_C.SOLVER.ADAM_BETA2 = 0.999
+_C.SOLVER.ADAM_EPS = 1e-08
+
+# Add different learning rates for different submodels
+_C.SOLVER.SAME_LR = True
 
 _C.SOLVER.MAX_ITER = 500  # 40000
 
