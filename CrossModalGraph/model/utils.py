@@ -118,6 +118,12 @@ class HeteroConv(Module):
                         return_attention_weights=True,
                         **kwargs,
                     )
+                elif "EdgeConv" in conv._get_name():
+                    out = conv(
+                        x=(x_dict[src], x_dict[dst]),
+                        edge_index=edge_index,
+                        **kwargs,
+                    )
                 else:
                     out = conv(
                         x=(x_dict[src], x_dict[dst]), edge_index=edge_index, **kwargs

@@ -180,7 +180,7 @@ _C.GRAPH.GRAPH_DROPOUT = 0.0
 # Add fusion layers
 _C.GRAPH.FUSION_LAYERS = []
 # Add the type of distance for matching graph construction
-_C.GRAPH.DISTANCE = "cosine" # "euclidean" or "cosine"
+_C.GRAPH.DISTANCE = "cosine"  # "euclidean" or "cosine"
 # Add number of audio and video nodes
 _C.GRAPH.NUM_AUDIO_NODES = 10
 _C.GRAPH.NUM_VIDEO_NODES = 10
@@ -214,11 +214,13 @@ _C.TRAINING.NON_LINEAR_ACTIVATION = (
 _C.SOLVER = CN()
 
 # See detectron2/solver/build.py for LR scheduler options
-_C.SOLVER.LR_SCHEDULER_NAME = "WarmupMultiStepLR" # "CosineAnnealingLR", "WarmupMultiStepLR"
+_C.SOLVER.LR_SCHEDULER_NAME = (
+    "WarmupMultiStepLR"  # "CosineAnnealingLR", "WarmupMultiStepLR"
+)
 _C.SOLVER.LR_SCHEDULER_T_MAX = 1000
 _C.SOLVER.LR_SCHEDULER_T_MULT = 1
 
-_C.SOLVER.OPTIM = "SGD" # "SGD", "Adam", "AdamW"
+_C.SOLVER.OPTIM = "SGD"  # "SGD", "Adam", "AdamW"
 
 # Add Adam optimizer params
 _C.SOLVER.ADAM_BETA1 = 0.9

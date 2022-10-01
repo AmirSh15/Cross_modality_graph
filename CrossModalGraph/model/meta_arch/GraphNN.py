@@ -12,12 +12,11 @@ from sklearn.metrics.pairwise import cosine_similarity
 from torch import nn
 from torch.nn.init import xavier_uniform_
 from torch_geometric.data import HeteroData
-from torch_geometric.nn import (BatchNorm, GATConv, GATv2Conv, GCNConv,
-                                GlobalAttention, GraphNorm, InstanceNorm,
-                                LayerNorm, Linear, PairNorm, SAGEConv,
-                                TransformerConv, global_max_pool,
+from torch_geometric.nn import (BatchNorm, EdgeConv, GATConv, GATv2Conv,
+                                GCNConv, GlobalAttention, GraphNorm,
+                                InstanceNorm, LayerNorm, Linear, PairNorm,
+                                SAGEConv, TransformerConv, global_max_pool,
                                 global_mean_pool)
-# from CrossModalGraph.model.GNN_models import GATConv
 from torch_geometric.utils.dropout import dropout_adj
 from torchaudio.pipelines import (WAV2VEC2_BASE, WAV2VEC2_LARGE,
                                   WAV2VEC2_LARGE_LV60K)
@@ -170,10 +169,15 @@ class EndToEndHeteroGNN(nn.Module):
                         heads=1,
                         concat=False,
                     )
+                    # ("video", "video-audio", "audio"): EdgeConv(
+                    #     nn.Sequential(
+                    #         nn.Linear(2 * hidden_channels, hidden_channels),
+                    #         nn.ReLU(),
+                    #         nn.Linear(hidden_channels, hidden_channels),
+                    #     )
+                    # )
                     if i in self.fusion_layers
                     else None,
-                    # ("video", "video-audio", "audio"): GATConv((-1, -1), hidden_channels, add_self_loops=self_loops,
-                    #                                            heads=1, concat=False),
                 },
                 aggr="sum",
             )
@@ -195,10 +199,14 @@ class EndToEndHeteroGNN(nn.Module):
         #                                         )
 
         # define norm layers
-        self.pre_norm_audio = nn.LayerNorm([self.num_aud_nodes, hidden_channels]).cuda()
-        self.pre_norm_video = nn.LayerNorm([self.num_vid_nodes, hidden_channels]).cuda()
-        # self.pre_norm_audio = nn.BatchNorm(hidden_channels).cuda()
-        # self.pre_norm_video = nn.BatchNorm(hidden_channels).cuda()
+        self.pre_norm_audio = nn.LayerNorm([self.num_aud_nodes, 512]).cuda()
+        self.pre_norm_video = nn.LayerNorm([self.num_vid_nodes, 512]).cuda()
+        # self.pre_norm_audio = nn.BatchNorm(512).cuda()
+        # self.pre_norm_video = nn.BatchNorm(512).cuda()
+
+        # define dim reduction layers
+        self.dim_reduction_a = nn.Linear(512, hidden_channels)
+        self.dim_reduction_v = nn.Linear(512, hidden_channels)
 
         # define output layer
         feat_dim = 2 * hidden_channels
@@ -207,12 +215,12 @@ class EndToEndHeteroGNN(nn.Module):
         )
         # self.lin = nn.Sequential(
         #     nn.Linear(feat_dim, 1024),
-        #     nn.ReLU(True),
+        #     nn.SiLU(True),
         #     nn.Dropout(p=0.2),
-        #     nn.Linear(1024, 1024),
-        #     nn.ReLU(True),
+        #     nn.Linear(1024, 256),
+        #     nn.SiLU(True),
         #     nn.Dropout(p=0.2),
-        #     nn.Linear(1024, out_dim),
+        #     nn.Linear(256, out_dim),
         # )
 
         # global attention pooling
@@ -376,7 +384,9 @@ class EndToEndHeteroGNN(nn.Module):
         """
         for key, edge_index in edge_index_dict.items():
             edge_index_dict[key] = dropout_adj(
-                edge_index=edge_index_dict[key], p=self.adj_dropout, training=self.training
+                edge_index=edge_index_dict[key],
+                p=self.adj_dropout,
+                training=self.training,
             )[0]
         return edge_index_dict
 
@@ -403,7 +413,7 @@ class EndToEndHeteroGNN(nn.Module):
                 for key, x in x_dict.items()
             }
             # apply activation
-            x_dict = {key: x.relu() for key, x in x_dict.items()}
+            x_dict = {key: F.silu(x) for key, x in x_dict.items()}
             # apply dropout
             if self.graph_dropout != 0:
                 x_dict = {
@@ -598,9 +608,7 @@ class EndToEndHeteroGNN(nn.Module):
             )
         ).to(self.device)
         metric["roc"] = torch.from_numpy(
-            np.asarray(
-                roc[~np.isnan(roc)].sum() / roc.shape[0]
-            )
+            np.asarray(roc[~np.isnan(roc)].sum() / roc.shape[0])
         ).to(self.device)
 
         metric["accuracy"] = torch.from_numpy(np.asarray(acc)).to(self.device)
@@ -667,6 +675,10 @@ class EndToEndHeteroGNN(nn.Module):
         if self.normalize:
             audio_feats = self.pre_norm_audio(audio_feats)
             video_feats = self.pre_norm_video(video_feats)
+
+        # apply dim reduction layers
+        audio_feats = self.dim_reduction_a(audio_feats)
+        video_feats = self.dim_reduction_v(video_feats)
 
         # update graph data
         batched_x["audio"] = audio_feats.flatten(start_dim=0, end_dim=1)
@@ -762,6 +774,10 @@ class EndToEndHeteroGNN(nn.Module):
         if self.normalize:
             audio_feats = self.pre_norm_audio(audio_feats)
             video_feats = self.pre_norm_video(video_feats)
+
+        # apply dim reduction layers
+        audio_feats = self.dim_reduction_a(audio_feats)
+        video_feats = self.dim_reduction_v(video_feats)
 
         # update graph data
         batched_x["audio"] = audio_feats.flatten(start_dim=0, end_dim=1)

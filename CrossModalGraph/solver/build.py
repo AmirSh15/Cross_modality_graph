@@ -127,9 +127,11 @@ def build_optimizer(cfg: CfgNode, model: torch.nn.Module) -> torch.optim.Optimiz
             weight_decay_bias=cfg.SOLVER.WEIGHT_DECAY_BIAS,
         )
     else:
-        grp = {"video_head": {"lr": cfg.SOLVER.BASE_LR/10},
-               "audio_head": {"lr": cfg.SOLVER.BASE_LR/10},
-               "lr": cfg.SOLVER.BASE_LR}
+        grp = {
+            "video_head": {"lr": cfg.SOLVER.BASE_LR / 10},
+            "audio_head": {"lr": cfg.SOLVER.BASE_LR / 10},
+            "lr": cfg.SOLVER.BASE_LR,
+        }
         params, _ = group_wise_lr(model=model, group_lr_conf=grp)
 
     if cfg.SOLVER.OPTIM == "SGD":
@@ -158,8 +160,6 @@ def build_optimizer(cfg: CfgNode, model: torch.nn.Module) -> torch.optim.Optimiz
         )
     else:
         raise ValueError("Unknown optimizer: {}".format(cfg.SOLVER.OPTIM))
-
-
 
 
 def get_default_optimizer_params(
@@ -263,7 +263,9 @@ def build_lr_scheduler(
         )
     elif name == "CosineAnnealingWarmRestarts":
         return torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
-            optimizer, T_0=cfg.SOLVER.LR_SCHEDULER_T_MAX, T_mult=1,
+            optimizer,
+            T_0=cfg.SOLVER.LR_SCHEDULER_T_MAX,
+            T_mult=1,
         )
     else:
         if name == "WarmupMultiStepLR":

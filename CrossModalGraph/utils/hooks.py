@@ -49,7 +49,7 @@ class CallbackHook(HookBase):
     """
 
     def __init__(
-            self, *, before_train=None, after_train=None, before_step=None, after_step=None
+        self, *, before_train=None, after_train=None, before_step=None, after_step=None
     ):
         """
         Each argument is a function that takes one argument: the trainer.
@@ -115,7 +115,7 @@ class IterationTimer(HookBase):
         hook_time = total_time - total_time_minus_hooks
 
         num_iter = (
-                self.trainer.storage.iter + 1 - self.trainer.start_iter - self._warmup_iter
+            self.trainer.storage.iter + 1 - self.trainer.start_iter - self._warmup_iter
         )
 
         if num_iter > 0 and total_time_minus_hooks > 0:
@@ -276,7 +276,9 @@ class LRScheduler(HookBase):
 
     def after_step(self):
         # lr = self._optimizer.param_groups[self._best_param_group_id]["lr"]
-        lr = self._optimizer.param_groups[self._best_param_group_id]["lr"] * 10  # 10x for showing base lr, as we
+        lr = (
+            self._optimizer.param_groups[self._best_param_group_id]["lr"] * 10
+        )  # 10x for showing base lr, as we
         # decreased pretrained models lr by 10x
         self.trainer.storage.put_scalar("lr", lr, smoothing_hint=False)
         self.scheduler.step()
@@ -316,7 +318,7 @@ class TorchProfiler(HookBase):
     """
 
     def __init__(
-            self, enable_predicate, output_dir, *, activities=None, save_tensorboard=True
+        self, enable_predicate, output_dir, *, activities=None, save_tensorboard=True
     ):
         """
         Args:
@@ -479,12 +481,12 @@ class EvalHook(HookBase):
     """
 
     def __init__(
-            self,
-            eval_period,
-            eval_function,
-            max_patience=5,
-            verbose=True,
-            path_to_save_best_model="checkpoints/",
+        self,
+        eval_period,
+        eval_function,
+        max_patience=5,
+        verbose=True,
+        path_to_save_best_model="checkpoints/",
     ):
         """
         Args:

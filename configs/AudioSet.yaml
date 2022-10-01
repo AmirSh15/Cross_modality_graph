@@ -21,9 +21,9 @@ TRAINING:
 GRAPH:
   DYNAMIC: False
 #  SPAN_OVER_TIME_AUDIO: 2
-#  AUDIO_DILATION: 2
-#  SPAN_OVER_TIME_VIDEO: 3
-#  VIDEO_DILATION: 3
+#  AUDIO_DILATION: 1
+#  SPAN_OVER_TIME_VIDEO: 1
+#  VIDEO_DILATION: 1
 #  SPAN_OVER_TIME_BETWEEN: 2
   SPAN_OVER_TIME_AUDIO: 2
   AUDIO_DILATION: 1
@@ -37,19 +37,20 @@ GRAPH:
   GRAPH_DROPOUT: 0.2
   FUSION_LAYERS: [-1]
   DISTANCE: "cosine"
-#  NUM_VIDEO_NODES: 40
-#  VIDEO_SEGMENT_LENGTH: 250
-  NUM_VIDEO_NODES: 10
-  VIDEO_SEGMENT_LENGTH: 1000
-#  NUM_AUDIO_NODES: 100
-#  AUDIO_SEGMENT_LENGTH: 960
-  NUM_AUDIO_NODES: 20
-  AUDIO_SEGMENT_LENGTH: 480
+#  NUM_VIDEO_NODES: 10 40 49
+#  VIDEO_SEGMENT_LENGTH: 1000 250 500 320
+  NUM_VIDEO_NODES: 20
+  VIDEO_SEGMENT_LENGTH: 500
+#  NUM_AUDIO_NODES: 10 20 30 40 50 100
+#  AUDIO_SEGMENT_LENGTH: 960 480 320 240 240 240
+  NUM_AUDIO_NODES: 30
+  AUDIO_SEGMENT_LENGTH: 320
 DATASETS:
   TRAIN_RATIO: 0.7
   EVAL_RATIO: 0.1
   TEST_RATIO: 0.2
   TRAIN_PATH: "/home/amir_shirian/Desktop/Codes/Cross_modality_graph/data/AudioSet/train"
+  EVAL_PATH: "/home/amir_shirian/Desktop/Codes/Cross_modality_graph/data/AudioSet/eval"
   TEST_PATH: "/home/amir_shirian/Desktop/Codes/Cross_modality_graph/data/AudioSet/eval"
 TEST:
   MAX_PATIENCE: 3
@@ -59,20 +60,20 @@ DATALOADER:
   STRATIFIED_SPLIT: True
   NUM_WORKERS: 6
 SOLVER:
-  OPTIM: "Adam"
-  BASE_LR: 0.0005
+  OPTIM: "SGD"
+  BASE_LR: 0.005
 # consider same learning rate for both audio, video and graph if True else will have 1/10 of the base learning rate for audio and video models
   SAME_LR: False
 # learning rate scheduler (options: "CosineAnnealingLR", "CosineAnnealingWarmRestarts", "WarmupMultiStepLR)
-  LR_SCHEDULER_NAME: "CosineAnnealingWarmRestarts"
+  LR_SCHEDULER_NAME: "WarmupMultiStepLR"
 # parameters for CosineAnnealingLR
-  LR_SCHEDULER_T_MAX: 2500
+  LR_SCHEDULER_T_MAX: 5000
 # parameters for CosineAnnealingWarmRestarts
   LR_SCHEDULER_T_MULT: 2
 # parameters for WarmupMultiStepLR
   WARMUP_ITERS: 1000
 #  Steps for decreasing lr for 1/10. The way you set: (1500,)
-  STEPS: ()
+  STEPS: (13000,)
   MAX_ITER: 100000
 # number of epochs to be accumulated before updating the parameters
   ITERS_TO_ACCUMULATE: 2

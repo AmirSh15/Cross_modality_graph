@@ -245,7 +245,7 @@ class AudioSetGraphDataset(Dataset):
                 while dt_edges[-1] >= self.num_vid_nodes:
                     dt_edges.pop(-1)
                     # make sure all nodes have same number of neighbors (same degree)
-                    dt_edges.insert(0, dt_edges[0] - video_dilation)
+                    dt_edges.insert(0, max(0, dt_edges[0] - video_dilation))
                 # remove self loops if not self_loops
                 if not self.self_loops and i in dt_edges:
                     dt_edges.remove(i)
@@ -268,9 +268,9 @@ class AudioSetGraphDataset(Dataset):
                 while dt_edges[-1] >= self.num_aud_nodes:
                     dt_edges.pop(-1)
                     # make sure all nodes have same number of neighbors (same degree)
-                    dt_edges.insert(0, dt_edges[0] - audio_dilation)
+                    dt_edges.insert(0, max(0, dt_edges[0] - audio_dilation))
                 # remove self loops if not self_loops
-                if not self.self_loops:
+                if not self.self_loops and i in dt_edges:
                     dt_edges.remove(i)
 
                 sr_edges = [i] * len(dt_edges)

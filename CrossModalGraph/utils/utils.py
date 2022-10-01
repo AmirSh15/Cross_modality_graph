@@ -134,8 +134,8 @@ def read_config():
         act = ""
     cfg.WANDB.GP_NAME = (
         f"with_graph_model_33_classes_{clip_grad}_{without_ft}_{cfg.GRAPH.NUM_AUDIO_NODES}_audio_"
-        f"{cfg.GRAPH.NUM_VIDEO_NODES}_video{amp}{label_smoothing}"
-        f"{l2_reg}{class_weights}{act}"
+        f"{cfg.GRAPH.NUM_VIDEO_NODES}_video{amp}"
+        f"{l2_reg}{act}"
     )
     cfg.WANDB.ID = get_random_string(
         len(cfg.WANDB.EXP_NAME) + cfg.SOLVER.ITERS_TO_ACCUMULATE
@@ -145,12 +145,12 @@ def read_config():
 
 
 def init_wab(
-        wab_config_path,
-        model_config,
-        entity,
-        project_name,
-        key,
-        config,
+    wab_config_path,
+    model_config,
+    entity,
+    project_name,
+    key,
+    config,
 ):
     import wandb
 
@@ -371,7 +371,7 @@ class DetectionCheckpointer(Checkpointer):
             with PathManager.open(filename, "rb") as f:
                 data = torch.load(f)
             assert (
-                    "model_state" in data
+                "model_state" in data
             ), f"Cannot load .pyth file {filename}; pycls checkpoints must contain 'model_state'."
             model_state = {
                 k: v
@@ -529,7 +529,11 @@ def group_wise_lr(model, group_lr_conf: Dict, path=""):
             names = list(map(lambda n: kl + "." + n, names))
             nms.extend(names)
 
-    primitives = {kk: vk for kk, vk in group_lr_conf.items() if type(vk) == float or type(vk) == int}
+    primitives = {
+        kk: vk
+        for kk, vk in group_lr_conf.items()
+        if type(vk) == float or type(vk) == int
+    }
     remaining_params = [(k, p) for k, p in model.named_parameters() if k not in nms]
     if len(remaining_params) > 0:
         names, params = zip(*remaining_params)

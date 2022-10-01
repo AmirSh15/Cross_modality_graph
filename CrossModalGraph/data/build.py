@@ -59,6 +59,34 @@ def build_AudioSet_data_loaders(cfg, output_mode="train"):
             [train_size, eval_size],
             generator=torch.Generator().manual_seed(seed),
         )
+    else:
+        # get transforms
+        video_frame_transform, audio_transform, video_transform = get_transforms(cfg)
+
+        test_dataset = AudioSetGraphDataset(
+            root=cfg.DATASETS.TEST_PATH,
+            config=cfg,
+            seed=seed,
+            desired_classes=cfg.DATALOADER.DISERED_CLASSES,
+            video_frame_transform=video_frame_transform,
+            audio_transform=audio_transform,
+            video_transform=video_transform,
+        )
+
+        # get transforms
+        video_frame_transform, audio_transform, video_transform = get_transforms(cfg)
+
+        eval_dataset = AudioSetGraphDataset(
+            root=cfg.DATASETS.EVAL_PATH,
+            config=cfg,
+            seed=seed,
+            desired_classes=cfg.DATALOADER.DISERED_CLASSES,
+            video_frame_transform=video_frame_transform,
+            audio_transform=audio_transform,
+            video_transform=video_transform,
+        )
+
+        train_dataset = dataset
 
     # stratified split
     if cfg.DATALOADER.STRATIFIED_SPLIT:
@@ -130,11 +158,6 @@ def build_AudioSet_data_loaders(cfg, output_mode="train"):
         return DataLoader(eval_dataset, cfg.DATALOADER.BATCH_SIZE, shuffle=True)
     if output_mode == "test":
         return DataLoader(test_dataset, cfg.DATALOADER.BATCH_SIZE, shuffle=False)
-    # return (
-    #     DataLoader(train_dataset, cfg.DATALOADER.BATCH_SIZE, sampler=sampler),
-    #     DataLoader(eval_dataset, cfg.DATALOADER.BATCH_SIZE, shuffle=True),
-    #     DataLoader(test_dataset, cfg.DATALOADER.BATCH_SIZE, shuffle=False),
-    # )
 
 
 def print_instances_class_histogram(dataset_dicts, class_names):
