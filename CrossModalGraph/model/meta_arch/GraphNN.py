@@ -176,8 +176,7 @@ class EndToEndHeteroGNN(nn.Module):
                     #         nn.Linear(hidden_channels, hidden_channels),
                     #     )
                     # )
-                    if i in self.fusion_layers
-                    else None,
+                    if i in self.fusion_layers else None,
                 },
                 aggr="sum",
             )
