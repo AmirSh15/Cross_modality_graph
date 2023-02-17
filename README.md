@@ -163,9 +163,9 @@ If you found this repo useful give me a star!
 ```
 @inproceedings{shirian2022visually,
   title={Visually-aware Acoustic Event Detection using Heterogeneous Graphs},
-  author={Shirian, Amir, Somandepalli, Krishna, Sanchez, Victor,  and Guha, Tanaya},
-  booktitle={Proc. Interspeech 2022},
-  year={2022}
+  author={Shirian, Amir, Somandepalli, Krishna, Ahmadian, Mona,  and Guha, Tanaya},
+  booktitle={Proc. ICASSP 2023},
+  year={2023}
 }
 ```
 
